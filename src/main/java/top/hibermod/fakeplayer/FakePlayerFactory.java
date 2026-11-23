@@ -39,6 +39,12 @@ public final class FakePlayerFactory {
                 ClientInformation.createDefault());
         FakeConnection connection = new FakeConnection();
 
+        // 与 Carpet 一致：**先定位再加入世界**。
+        // placeNewPlayer 会把实体按当前坐标塞进 level；ServerPlayer 默认坐标是
+        // (0,0,0)/世界出生点，若那里是方块内部、岩浆或虚空，加入瞬间就会受伤甚至死亡。
+        // 之后再把血量拉回 20，只会留下"死亡动画卡在第一帧、kill 却认为还活着"的假死状态。
+        player.moveTo(x, feetY, z, player.getYRot(), player.getXRot());
+
         // 关键时序：必须在 placeNewPlayer 之前登记。
         // placeNewPlayer 会触发 PlayerLoggedInEvent，流量统计模块在那个时机判断"是不是假人"；
         // 如果先上线后登记，这一判断会落到"连接存在"的分支上，假人就被当成真人记账了。
@@ -50,10 +56,14 @@ public final class FakePlayerFactory {
         // 与 Carpet 的生成步骤对齐（当前版本没有带 Set/boolean 的 teleportTo 重载）
         player.stopRiding();                       // 否则假人会骑在上一个载具上
         player.teleportTo(level, x, feetY, z, player.getYRot(), player.getXRot());
-        player.setHealth(20.0F);
+        player.setHealth(player.getMaxHealth());
         player.revive();
         player.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.STEP_HEIGHT)
                 .setBaseValue(0.6F);
+
+        // 清掉入场伤害/旧 playerdata 留下的死亡状态：
+        // deathTime > 0 而血量 > 0 正是"假死动画反复抽搐"的来源
+        resetDeathState(player);
 
         // 加入流程收尾：placeNewPlayer 会向假人发一次位置同步包，
         // 监听器据此进入"等待客户端回执"状态。假人没有客户端，
@@ -64,6 +74,26 @@ public final class FakePlayerFactory {
                 name, level.dimension().location(), x, y, z);
         FakePlayerLib.get().persist();
         return player;
+    }
+
+    /**
+     * 清掉死亡残留状态。
+     *
+     * <p>血量被拉回但 {@code deathTime}/{@code hurtTime} 还留着时，实体就会持续播放
+     * 死亡第一帧、看着像抽搐，而 {@code isDeadOrDying()} 为 false —— 也就是"假死"。
+     */
+    private static void resetDeathState(ServerPlayer player) {
+        try {
+            player.deathTime = 0;
+            player.hurtTime = 0;
+            player.hurtDuration = 0;
+            player.setHealth(player.getMaxHealth());
+            player.clearFire();
+            player.setAirSupply(player.getMaxAirSupply());
+            player.invulnerableTime = 0;
+        } catch (Throwable t) {
+            FakePlayerLib.LOGGER.warn("[fakeplayerlib] failed to reset death state: {}", t.toString());
+        }
     }
 
     /**
