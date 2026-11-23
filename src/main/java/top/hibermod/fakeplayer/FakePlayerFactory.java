@@ -111,10 +111,21 @@ public final class FakePlayerFactory {
      * 原生退场。
      *
      * <p>1.21.1 的「xxx 离开了游戏」广播写在
-     * {@code ServerGamePacketListenerImpl.removePlayerFromWorld()} 里，
-     * 只有 {@code onDisconnect(...)} 会触发它；{@code PlayerList.remove} 不会广播。
-     * 因此这里走连接的原生断开路径：广播、`player.disconnect()`、玩家列表移除
-     * 全部由原版完成，不手工拼消息。
+     * {@code ServerGamePacketListenerImpl.removePlayerFromWorld()} 里
+     * （广播 + {@code player.disconnect()} + {@code playerList.remove()}），
+     * 而 {@code PlayerList.remove} 本身不广播 —— 所以必须走监听器的这条原生路径。
+     *
+     * <p>为什么不直接 {@code connection.disconnect(...)}：
+     * 它最终是 {@code server.executeBlocking(connection::handleDisconnection)}，
+     * 而假人连接把 {@code handleDisconnection} 留空（避免真实网络 I/O），
+     * 事件永远到不了监听器 —— 这正是"死亡变幽灵"的根因。
+     *
+     * <p>为什么不直接 {@code onDisconnect(...)}：
+     * {@code ServerCommonPacketListenerImpl.onDisconnect} 里有
+     * {@code if (isSingleplayerOwner()) server.halt(false);}，
+     * 而离线单人下假人的名字/UUID 恰好等于房主，会直接把存档服务器关掉。
+     * 因此反射调用 {@code removePlayerFromWorld()} 这一支路：
+     * 同样是原版代码，但不会误关单人服务器。
      */
     public static void disconnect(MinecraftServer server, ServerPlayer player) {
         FakePlayerLib lib = FakePlayerLib.get();
@@ -122,24 +133,32 @@ public final class FakePlayerFactory {
             lib.untrack(player.getUUID());
         }
         top.hibermod.fakeplayer.FakeInput.forget(player.getUUID());
-        try {
-            if (player.connection != null) {
-                // 直接触发监听器的原生断开：
-                // ServerGamePacketListenerImpl.onDisconnect → removePlayerFromWorld
-                // → 原生「xxx 离开了游戏」广播 + player.disconnect() + playerList.remove()
-                //
-                // 不能只调 connection.disconnect(...)：原版那条路径最终依赖
-                // Connection.handleDisconnection() 分发事件，而假人连接把该方法留空了
-                // （不产生网络 I/O），事件永远不会到达监听器 —— 这正是"死亡变幽灵"的原因。
-                player.connection.onDisconnect(
-                        new net.minecraft.network.DisconnectionDetails(
-                                net.minecraft.network.chat.Component.translatable(
-                                        "multiplayer.disconnect.generic")));
-            } else {
-                server.getPlayerList().remove(player);
+        boolean done = false;
+        if (player.connection != null) {
+            try {
+                var m = player.connection.getClass()
+                        .getDeclaredMethod("removePlayerFromWorld");
+                m.setAccessible(true);
+                m.invoke(player.connection);
+                done = true;
+            } catch (Throwable t) {
+                FakePlayerLib.LOGGER.debug(
+                        "[fakeplayerlib] removePlayerFromWorld unavailable: {}", t.toString());
             }
-        } catch (Throwable t) {
-            FakePlayerLib.LOGGER.warn("[fakeplayerlib] native disconnect failed: {}", t.toString());
+            if (!done) {
+                try {
+                    player.connection.onDisconnect(
+                            new net.minecraft.network.DisconnectionDetails(
+                                    net.minecraft.network.chat.Component.translatable(
+                                            "multiplayer.disconnect.generic")));
+                    done = true;
+                } catch (Throwable t) {
+                    FakePlayerLib.LOGGER.debug(
+                            "[fakeplayerlib] onDisconnect fallback failed: {}", t.toString());
+                }
+            }
+        }
+        if (!done) {
             server.getPlayerList().remove(player);
         }
         FakePlayerLib.LOGGER.info("[fakeplayerlib] fake player left: {}", player.getGameProfile().getName());
