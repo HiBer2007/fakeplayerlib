@@ -135,23 +135,23 @@ public final class FakeAction {
         return now + 1;
     }
 
+    /**
+     * 与原版客户端一致的攻击目标选择：沿视线做实体射线检测。
+     *
+     * <p>之前用"附近最近实体"是错的 —— 会打到背后/侧面的东西，
+     * 表现就像"打了没有反馈"。原版 {@code LocalPlayer} 走的是
+     * {@code ProjectileUtil.getEntityHitResult}，Carpet 也是同样的射线追踪。
+     */
     private static Entity nearestTarget(ServerPlayer player) {
+        double reach = player.gameMode.isCreative() ? 5.0 : 4.5;
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getLookAngle();
-        Vec3 end = eye.add(look.scale(3.0));
-        AABB box = new AABB(eye, end).inflate(1.0);
-        Entity best = null;
-        double bestDist = Double.MAX_VALUE;
-        for (Entity e : player.level().getEntities(player, box)) {
-            if (!e.isAlive() || e == player) {
-                continue;
-            }
-            double d = e.distanceToSqr(player);
-            if (d < bestDist) {
-                bestDist = d;
-                best = e;
-            }
-        }
-        return best;
+        Vec3 end = eye.add(look.scale(reach));
+        AABB box = player.getBoundingBox().expandTowards(look.scale(reach)).inflate(1.0);
+        var hit = net.minecraft.world.entity.projectile.ProjectileUtil.getEntityHitResult(
+                player, eye, end, box,
+                e -> !e.isSpectator() && e.isPickable() && e != player,
+                reach * reach);
+        return hit == null ? null : hit.getEntity();
     }
 }

@@ -55,6 +55,11 @@ public final class FakePlayerFactory {
         player.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.STEP_HEIGHT)
                 .setBaseValue(0.6F);
 
+        // 加入流程收尾：placeNewPlayer 会向假人发一次位置同步包，
+        // 监听器据此进入"等待客户端回执"状态。假人没有客户端，
+        // 这里直接清空该状态（等价于客户端回了一次 AcceptTeleportation）。
+        player.connection.resetPosition();
+
         FakePlayerLib.LOGGER.info("[fakeplayerlib] spawned fake player {} @ {} {} {} {}",
                 name, level.dimension().location(), x, y, z);
         FakePlayerLib.get().persist();
@@ -119,8 +124,17 @@ public final class FakePlayerFactory {
         top.hibermod.fakeplayer.FakeInput.forget(player.getUUID());
         try {
             if (player.connection != null) {
-                player.connection.disconnect(
-                        net.minecraft.network.chat.Component.translatable("multiplayer.disconnect.generic"));
+                // 直接触发监听器的原生断开：
+                // ServerGamePacketListenerImpl.onDisconnect → removePlayerFromWorld
+                // → 原生「xxx 离开了游戏」广播 + player.disconnect() + playerList.remove()
+                //
+                // 不能只调 connection.disconnect(...)：原版那条路径最终依赖
+                // Connection.handleDisconnection() 分发事件，而假人连接把该方法留空了
+                // （不产生网络 I/O），事件永远不会到达监听器 —— 这正是"死亡变幽灵"的原因。
+                player.connection.onDisconnect(
+                        new net.minecraft.network.DisconnectionDetails(
+                                net.minecraft.network.chat.Component.translatable(
+                                        "multiplayer.disconnect.generic")));
             } else {
                 server.getPlayerList().remove(player);
             }
