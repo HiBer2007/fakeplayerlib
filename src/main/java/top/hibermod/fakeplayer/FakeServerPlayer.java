@@ -28,9 +28,15 @@ public class FakeServerPlayer extends ServerPlayer {
 
     @Override
     public void tick() {
-        // 与 Carpet 一致：定期同步位置（chunkSource.move 在本映射下签名不同，故省略）
+        // 与 Carpet 一致：定期同步位置并推进区块追踪。
+        // 玩家区块加载的原版入口是 ServerChunkCache.move(player)，
+        // 它平时由 ServerGamePacketListenerImpl.tick() 调用；假人没有网络循环在跑，
+        // 所以必须在这里补上，否则假人周围永远不加载区块。
         if (this.level().getServer().getTickCount() % 10 == 0) {
             this.connection.resetPosition();
+            if (this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+                ((net.minecraft.server.level.ServerChunkCache) sl.getChunkSource()).move(this);
+            }
         }
         try {
             super.tick();

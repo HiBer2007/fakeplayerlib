@@ -54,7 +54,8 @@ public final class FakeGuiServer {
     private static String buildJson(ServerPlayer fake) {
         StringBuilder inv = new StringBuilder();
         var container = fake.getInventory();
-        for (int i = 0; i < Math.min(36, container.getContainerSize()); i++) {
+        // 0-8 快捷栏，9-35 主背包，36-39 护甲，40 副手：与客户端面板的槽位坐标一一对应
+        for (int i = 0; i < Math.min(41, container.getContainerSize()); i++) {
             var stack = container.getItem(i);
             if (stack.isEmpty()) {
                 continue;
@@ -76,6 +77,7 @@ public final class FakeGuiServer {
                 + "\"health\":" + round(fake.getHealth()) + ","
                 + "\"maxHealth\":" + round(fake.getMaxHealth()) + ","
                 + "\"selected\":" + container.selected + ","
+                + "\"food\":" + fake.getFoodData().getFoodLevel() + ","
                 + "\"inv\":[" + inv + "]}";
     }
 

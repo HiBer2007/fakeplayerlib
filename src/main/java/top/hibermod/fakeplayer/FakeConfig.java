@@ -28,10 +28,13 @@ public final class FakeConfig {
     public boolean serverEnabled = true;
     /** 客户端右键假人是否打开面板。 */
     public boolean clientGuiEnabled = true;
-    /** 假人视距（区块）。 */
-    public int viewDistance = 8;
-    /** 假人模拟距离（区块）。 */
-    public int simulationDistance = 6;
+    /**
+     * 假人视距（区块）。{@code -1} = 跟随服务器设定（服务器 view-distance），
+     * 也是默认值：假人不该比服务器允许的范围更小，否则周围不加载区块。
+     */
+    public int viewDistance = -1;
+    /** 假人模拟距离（区块）。{@code -1} = 跟随服务器 simulation-distance。 */
+    public int simulationDistance = -1;
     /** 已启用的行为 id。 */
     public Set<String> behaviors = new LinkedHashSet<>(Set.of("idle"));
 
@@ -127,11 +130,26 @@ public final class FakeConfig {
 
     public void applyTo(net.minecraft.server.level.ServerPlayer player) {
         try {
-            // requestedViewDistance 决定服务端给这个玩家发多少区块；不同版本入口名不同，
-            // 用反射兜住，取不到就算了（不影响其它功能）。
-            var m = player.getClass().getMethod("setRequestedViewDistance", int.class);
-            m.invoke(player, Math.max(2, Math.min(32, viewDistance)));
-        } catch (Throwable ignored) {
+            var server = player.getServer();
+            int serverView = server == null ? 10 : server.getPlayerList().getViewDistance();
+            // -1 = 跟随服务器设定；否则按配置，但不允许超过服务器上限
+            int view = viewDistance < 0 ? serverView : Math.min(viewDistance, serverView);
+            view = Math.max(2, Math.min(32, view));
+
+            var info = new net.minecraft.server.level.ClientInformation(
+                    player.clientInformation().language(),
+                    view,
+                    player.clientInformation().chatVisibility(),
+                    player.clientInformation().chatColors(),
+                    player.clientInformation().modelCustomisation(),
+                    player.clientInformation().mainHand(),
+                    player.clientInformation().textFilteringEnabled(),
+                    player.clientInformation().allowsListing());
+            // 原生入口：与客户端上报 ClientInformation 走同一条逻辑，写入 requestedViewDistance
+            player.connection.handleClientInformation(
+                    new net.minecraft.network.protocol.common.ServerboundClientInformationPacket(info));
+        } catch (Throwable t) {
+            FakePlayerLib.LOGGER.warn("[fakeplayerlib] failed to apply view distance: {}", t.toString());
         }
     }
 
