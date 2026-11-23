@@ -64,6 +64,10 @@ public final class FakeCommand {
                         .then(Commands.literal("on").executes(ctx -> clientGui(ctx.getSource(), true)))
                         .then(Commands.literal("off").executes(ctx -> clientGui(ctx.getSource(), false)))));
 
+        // 二次确认：警告里的 [确认]/[取消] 点击后等价于这两条命令；控制台也手动输入它们
+        root.then(Commands.literal("accept").executes(ctx -> accept(ctx.getSource())));
+        root.then(Commands.literal("cancel").executes(ctx -> cancel(ctx.getSource())));
+
         root.then(Commands.literal("behavior")
                 .then(Commands.literal("list").executes(ctx -> behaviorList(ctx.getSource())))
                 .then(Commands.literal("enable")
@@ -136,6 +140,22 @@ public final class FakeCommand {
         return 1;
     }
 
+    private static int accept(CommandSourceStack src) {
+        ConfirmManager.Pending p = ConfirmManager.take(src);
+        if (p == null) {
+            src.sendFailure(Component.literal("§cnothing to confirm"));
+            return 0;
+        }
+        String[] parts = p.action().split(":", 2);
+        return PlayerCommand.executePending(src, parts[0], parts.length > 1 ? parts[1] : "");
+    }
+
+    private static int cancel(CommandSourceStack src) {
+        ConfirmManager.cancel(src);
+        feedback(src, "§acancelled");
+        return 1;
+    }
+
     private static int behaviorList(CommandSourceStack src) {
         feedback(src, "§6行为（★=启用）:");
         for (String id : BEHAVIORS.stream().sorted().toList()) {
@@ -182,6 +202,7 @@ public final class FakeCommand {
             return 0;
         }
         var pos = src.getPosition();
+        double feetY = top.hibermod.fakeplayer.FakePlayerFactory.feetY(src);
         var level = src.getLevel();
         try {
             ServerPlayer fake = top.hibermod.fakeplayer.FakePlayerFactory.spawn(

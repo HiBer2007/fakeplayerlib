@@ -78,4 +78,32 @@ public class FakeConnection extends Connection {
             // EmbeddedChannel 已关闭
         }
     }
+
+    /**
+     * 把这条连接登记进服务端的网络 tick 循环。
+     *
+     * <p>这是"不需要手动 tick"的关键：{@code ServerConnectionListener.tick()} 会遍历
+     * {@code channels} 并对每条连接调 {@code connection.tick()}，
+     * 而 {@code Connection.tick()} 会驱动 {@code packetListener.tick()}，
+     * 也就是 {@code ServerGamePacketListenerImpl.tick()} → {@code player.doTick()}。
+     * 假人的连接只要在这个集合里，玩家物理、位移、区块跟随就全部由原版链路自动完成。
+     */
+    public void attachToServerLoop(net.minecraft.server.MinecraftServer server) {
+        try {
+            Object listener = server.getConnection();
+            Field f = listener.getClass().getDeclaredField("channels");
+            f.setAccessible(true);
+            Object value = f.get(listener);
+            if (value instanceof java.util.List<?> list) {
+                @SuppressWarnings("unchecked")
+                java.util.List<Connection> channels = (java.util.List<Connection>) list;
+                if (!channels.contains(this)) {
+                    channels.add(this);
+                }
+            }
+        } catch (Throwable t) {
+            FakePlayerLib.LOGGER.warn("[fakeplayerlib] failed to attach connection to server tick loop: {}",
+                    t.toString());
+        }
+    }
 }

@@ -35,6 +35,46 @@ public final class FakeConfig {
     /** 已启用的行为 id。 */
     public Set<String> behaviors = new LinkedHashSet<>(Set.of("idle"));
 
+    // ---- 假人加入游戏时的默认游戏模式：follow = 跟随发起者当前模式 ----
+    public String gameMode = "follow";
+
+    // ---- 加入保护（默认全部关闭） ----
+    /** 真人登录过的名字不允许再生成其假人。 */
+    public boolean denySpawnForPlayedNames = false;
+    /** 名字已被假人占用时，拒绝真人登录并提示。 */
+    public boolean denyLoginForFakeNames = false;
+    /** 禁止对假人执行会影射到真人的操作（如 dropall）。 */
+    public boolean guardRealPlayerActions = false;
+    /** OP 可以用 force 跳过所有警告。 */
+    public boolean allowForce = true;
+
+    // ---- 指令权限等级（0=普通玩家，2=OP，4=控制台） ----
+    public int spawnLevel = 2;
+    public int killLevel = 2;
+    public int moveLevel = 0;
+    public int useLevel = 0;
+    public int guiLevel = 0;
+
+    /** 可配置的动作级别。 */
+    public enum Action {
+        SPAWN(2), KILL(2), MOVE(0), USE(0), GUI(0);
+        public final int defaultLevel;
+
+        Action(int defaultLevel) {
+            this.defaultLevel = defaultLevel;
+        }
+    }
+
+    public int level(Action action) {
+        return switch (action) {
+            case SPAWN -> spawnLevel;
+            case KILL -> killLevel;
+            case MOVE -> moveLevel;
+            case USE -> useLevel;
+            case GUI -> guiLevel;
+        };
+    }
+
     public static Path fileOf(MinecraftServerRef server) {
         return server.serverDir().resolve(REL_PATH);
     }

@@ -52,13 +52,31 @@ public final class FakeGuiServer {
     }
 
     private static String buildJson(ServerPlayer fake) {
+        StringBuilder inv = new StringBuilder();
+        var container = fake.getInventory();
+        for (int i = 0; i < Math.min(36, container.getContainerSize()); i++) {
+            var stack = container.getItem(i);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            if (inv.length() > 0) {
+                inv.append(',');
+            }
+            inv.append("{\"slot\":").append(i)
+                    .append(",\"id\":\"").append(esc(
+                            net.minecraft.core.registries.BuiltInRegistries.ITEM
+                                    .getKey(stack.getItem()).toString()))
+                    .append("\",\"count\":").append(stack.getCount()).append('}');
+        }
         return "{\"name\":\"" + esc(fake.getGameProfile().getName()) + "\","
                 + "\"dim\":\"" + esc(fake.level().dimension().location().toString()) + "\","
                 + "\"x\":" + round(fake.getX()) + ","
                 + "\"y\":" + round(fake.getY()) + ","
                 + "\"z\":" + round(fake.getZ()) + ","
                 + "\"health\":" + round(fake.getHealth()) + ","
-                + "\"maxHealth\":" + round(fake.getMaxHealth()) + "}";
+                + "\"maxHealth\":" + round(fake.getMaxHealth()) + ","
+                + "\"selected\":" + container.selected + ","
+                + "\"inv\":[" + inv + "]}";
     }
 
     /** 处理客户端按钮。 */
@@ -66,15 +84,19 @@ public final class FakeGuiServer {
         if (!(ctx.player() instanceof ServerPlayer player)) {
             return;
         }
-        String[] parts = payload.body().split("\\|", 2);
+        String[] parts = payload.body().split("\\|", 3);
         if (parts.length < 2) {
             return;
         }
         String action = parts[0];
         String name = parts[1];
+        String arg = parts.length > 2 ? parts[2] : "";
 
-        if (!player.hasPermissions(2)) {
-            player.sendSystemMessage(Component.literal("§c没有权限操作假人"));
+        // 权限与指令一致：等级来自配置，默认普通玩家只能操作自己名下的假人
+        if (!top.hibermod.fakeplayer.command.PlayerCommand.mayOperate(player, name)
+                && !player.hasPermissions(FakePlayerLib.get().config().level(
+                        top.hibermod.fakeplayer.FakeConfig.Action.GUI))) {
+            player.sendSystemMessage(Component.literal("§cnot allowed to operate this fake player"));
             return;
         }
 
@@ -84,7 +106,7 @@ public final class FakeGuiServer {
         }
         ServerPlayer fake = FakePlayerLib.get().find(server, name);
         if (fake == null) {
-            player.sendSystemMessage(Component.literal("§c假人 " + name + " 已不存在"));
+            player.sendSystemMessage(Component.literal("§cfake player " + name + " no longer exists"));
             return;
         }
 
@@ -92,17 +114,59 @@ public final class FakeGuiServer {
             case "tp_to" -> {
                 player.teleportTo(fake.serverLevel(), fake.getX(), fake.getY(), fake.getZ(),
                         player.getYRot(), player.getXRot());
-                player.sendSystemMessage(Component.literal("§a已传送到假人 " + name));
+                player.sendSystemMessage(Component.literal("§ateleported to " + name));
             }
             case "bring" -> {
                 fake.teleportTo(player.serverLevel(), player.getX(), player.getY(), player.getZ(),
                         fake.getYRot(), fake.getXRot());
-                player.sendSystemMessage(Component.literal("§a假人 " + name + " 已传送到你身边"));
+                player.sendSystemMessage(Component.literal("§amoved " + name + " to you"));
                 send(player, fake);
             }
             case "kill" -> {
                 FakePlayerFactory.remove(server, fake);
-                player.sendSystemMessage(Component.literal("§a已移除假人 " + name));
+                player.sendSystemMessage(Component.literal("§aremoved " + name));
+            }
+            case "use" -> {
+                top.hibermod.fakeplayer.FakeAction.setUse(fake.getUUID(),
+                        top.hibermod.fakeplayer.FakeAction.Mode.ONCE, 4);
+                player.sendSystemMessage(Component.literal("§a" + name + " uses once"));
+            }
+            case "use_continuous" -> {
+                top.hibermod.fakeplayer.FakeAction.setUse(fake.getUUID(),
+                        top.hibermod.fakeplayer.FakeAction.Mode.CONTINUOUS, 1);
+                player.sendSystemMessage(Component.literal("§a" + name + " keeps using"));
+            }
+            case "use_stop" -> {
+                top.hibermod.fakeplayer.FakeAction.setUse(fake.getUUID(), null, 4);
+                player.sendSystemMessage(Component.literal("§a" + name + " stopped using"));
+            }
+            case "attack" -> {
+                top.hibermod.fakeplayer.FakeAction.setAttack(fake.getUUID(),
+                        top.hibermod.fakeplayer.FakeAction.Mode.ONCE, 4);
+                player.sendSystemMessage(Component.literal("§a" + name + " attacks once"));
+            }
+            case "attack_continuous" -> {
+                top.hibermod.fakeplayer.FakeAction.setAttack(fake.getUUID(),
+                        top.hibermod.fakeplayer.FakeAction.Mode.CONTINUOUS, 1);
+                player.sendSystemMessage(Component.literal("§a" + name + " keeps attacking"));
+            }
+            case "attack_stop" -> {
+                top.hibermod.fakeplayer.FakeAction.setAttack(fake.getUUID(), null, 4);
+                player.sendSystemMessage(Component.literal("§a" + name + " stopped attacking"));
+            }
+            case "drop_all" -> {
+                fake.getInventory().clearContent();
+                player.sendSystemMessage(Component.literal("§adropped inventory of " + name));
+                send(player, fake);
+            }
+            case "hotbar" -> {
+                try {
+                    int slot = Integer.parseInt(arg);
+                    fake.getInventory().selected = Math.max(0, Math.min(8, slot - 1));
+                    player.sendSystemMessage(Component.literal("§a" + name + " hotbar slot = " + slot));
+                    send(player, fake);
+                } catch (NumberFormatException ignored) {
+                }
             }
             case "refresh" -> send(player, fake);
             default -> FakePlayerLib.LOGGER.debug("[fakeplayerlib] unknown panel action: {}", action);

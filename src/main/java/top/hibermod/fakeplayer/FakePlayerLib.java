@@ -48,11 +48,51 @@ public class FakePlayerLib {
         instance = this;
         var bus = NeoForge.EVENT_BUS;
         bus.addListener(this::onRegisterCommands);
+        // 纯客户端指令（/fakeplayerlibc）只在客户端注册
+        if (net.neoforged.fml.loading.FMLEnvironment.dist
+                == net.neoforged.api.distmarker.Dist.CLIENT) {
+            bus.addListener(top.hibermod.fakeplayer.client.ClientSetup::registerClientCommands);
+        }
         bus.addListener(this::onTick);
         bus.addListener(this::onStopping);
         bus.addListener(this::onServerStarted);
+        bus.addListener(this::onLivingDeath);
+        bus.addListener(this::onPlayerLogin);
         bus.addListener(top.hibermod.fakeplayer.gui.FakeGuiServer::onEntityInteract);
         modBus.addListener(FakePlayerLib::onRegisterPayloads);
+    }
+
+    /** 假人死亡：立即走完退场流程，不让它僵在死亡态。 */
+    private void onLivingDeath(net.neoforged.neoforge.event.entity.living.LivingDeathEvent event) {
+        if (event.getEntity() instanceof ServerPlayer p && isFake(p.getUUID())) {
+            onFakeDeath(p);
+        }
+    }
+
+    /**
+     * 保护 2：名字已被活跃假人占用时，拒绝真人登录并说明原因。
+     *
+     * <p>假人自己上线时（placeNewPlayer 也会触发该事件）必须跳过，否则假人永远上不来。
+     */
+    private void onPlayerLogin(
+            net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        if (!config().denyLoginForFakeNames) {
+            return;
+        }
+        var entity = event.getEntity();
+        if (isFake(entity.getUUID())) {
+            return;
+        }
+        String name = entity.getGameProfile().getName();
+        if (byName.containsKey(name.toLowerCase(java.util.Locale.ROOT))
+                && entity instanceof ServerPlayer sp && sp.connection != null) {
+            try {
+                sp.connection.disconnect(net.minecraft.network.chat.Component.literal(
+                        "This name is currently in use by a fake player on this server"));
+            } catch (Throwable t) {
+                LOGGER.warn("[fakeplayerlib] failed to reject duplicate login: {}", t.toString());
+            }
+        }
     }
 
     private static void onRegisterPayloads(
@@ -133,6 +173,36 @@ public class FakePlayerLib {
         return uuid == null ? null : server.getPlayerList().getPlayer(uuid);
     }
 
+    /** 是否是本模组托管的假人。 */
+    public boolean isFake(UUID uuid) {
+        return uuid != null && fakes.containsKey(uuid);
+    }
+
+    /**
+     * 假人死亡处理。
+     *
+     * <p>假人没有真实连接，原版死亡流程要等客户端回执才会走完，
+     * 于是会永远停在死亡态（看起来就是"卡在死亡画面"）。这里直接把它当成
+     * 正常退出：摘出玩家列表、清掉动作包、持久化。
+     */
+    public void onFakeDeath(ServerPlayer player) {
+        UUID uuid = player.getUUID();
+        if (!isFake(uuid)) {
+            return;
+        }
+        FakeAction.clear(uuid);
+        MinecraftServer server = player.server;
+        try {
+            server.execute(() -> {
+                if (server.getPlayerList().getPlayer(uuid) != null) {
+                    FakePlayerFactory.remove(server, player);
+                }
+            });
+        } catch (Throwable t) {
+            LOGGER.warn("[fakeplayerlib] death cleanup failed for {}: {}", uuid, t.toString());
+        }
+    }
+
     void track(UUID uuid, String name, FakeConnection connection) {
         fakes.put(uuid, new Entry(uuid, name, connection));
         byName.put(name.toLowerCase(), uuid);
@@ -175,12 +245,23 @@ public class FakePlayerLib {
     // ---------------------------------------------------------- 事件
 
     private void onRegisterCommands(RegisterCommandsEvent event) {
-        FakeCommand.register(event.getDispatcher());
+        // /player 对齐 Carpet；/hbfake 已废弃移除
+        top.hibermod.fakeplayer.command.PlayerCommand.register(event.getDispatcher());
+        top.hibermod.fakeplayer.command.FakeCommand.register(event.getDispatcher());
     }
 
     private void onTick(ServerTickEvent.Post event) {
         if (fakes.isEmpty()) {
             return;
+        }
+        long gameTime = event.getServer().overworld() == null ? 0L
+                : event.getServer().overworld().getGameTime();
+        // 动作包驱动所有持有者（假人 + 被当作操作目标的真人玩家）
+        for (java.util.UUID u : FakeAction.active()) {
+            ServerPlayer p = event.getServer().getPlayerList().getPlayer(u);
+            if (p != null) {
+                FakeAction.tick(p, gameTime);
+            }
         }
         if (event.getServer().getTickCount() % 200 == 0) {
             for (Entry e : fakes.values()) {
