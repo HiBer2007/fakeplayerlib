@@ -87,8 +87,11 @@ public final class FakeClient {
         Entity target = rayTarget(player, reach);
         if (target != null) {
             stopBreaking(player);
-            player.connection.handleInteract(
-                    ServerboundInteractPacket.createAttackPacket(target, player.isShiftKeyDown()));
+            // 实体攻击按原版攻击冷却过滤（与真实客户端一致），否则一 tick 打很多次
+            if (player.getAttackStrengthScale(0.5F) >= 0.9F) {
+                player.connection.handleInteract(
+                        ServerboundInteractPacket.createAttackPacket(target, player.isShiftKeyDown()));
+            }
             return;
         }
         stopBreaking(player);

@@ -94,15 +94,9 @@ public final class FakeAction {
             }
         }
         if (p.attackMode != null && due(p.attackMode, p.attackInterval, p.attackNextTick, gameTime)) {
-            // 与真实客户端一致：攻击冷却（充能）未就绪就不发攻击。
-            // 连续攻击每 tick 都打会让充能恒为 0 —— 原版击退/伤害分支都不成立，
-            // 表现出来就是"完全没有击退"。
-            float charge = player.getAttackStrengthScale(0.5F);
-            if (p.attackMode == Mode.CONTINUOUS && charge < 0.95F) {
-                return;
-            }
             p.attackNextTick = next(p.attackMode, p.attackInterval, gameTime);
-            // 真实左键：命中方块就挖、命中实体就打，走原版 PlayerAction/Interact 包
+            // 每 tick 都当作"按住左键"：挖方块需要持续 tick（进度在 gameMode.tick() 里推进），
+            // 打实体由 FakeClient 内部按攻击冷却过滤，避免一 tick 打无数次
             top.hibermod.fakeplayer.FakeClient.leftClick(player);
             if (p.attackMode == Mode.ONCE) {
                 p.attackMode = null;
