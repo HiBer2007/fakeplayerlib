@@ -139,6 +139,16 @@ public final class FakeClient {
         }
     }
 
+    /** 松开右键：结束进食/拉弓等"使用中"状态（原版 RELEASE_USE_ITEM）。 */
+    public static void useRelease(ServerPlayer player) {
+        if (player.connection == null || !player.isUsingItem()) {
+            return;
+        }
+        player.connection.handlePlayerAction(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM,
+                BlockPos.containing(player.position()), Direction.DOWN));
+    }
+
     /** Q 键：丢弃手持（单个或整栈）。 */
     public static void drop(ServerPlayer player, boolean all) {
         if (player.connection == null) {

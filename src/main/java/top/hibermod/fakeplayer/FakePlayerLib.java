@@ -264,6 +264,13 @@ public class FakePlayerLib {
                 FakeAction.tick(p, gameTime);
             }
         }
+        // 自动进食对每个活跃假人生效（不受动作包影响）
+        for (Entry e : fakes.values()) {
+            ServerPlayer p = event.getServer().getPlayerList().getPlayer(e.uuid());
+            if (p != null) {
+                FakeAutoEat.tick(p);
+            }
+        }
         if (event.getServer().getTickCount() % 200 == 0) {
             for (Entry e : fakes.values()) {
                 e.connection().drain();

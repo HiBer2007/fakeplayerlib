@@ -51,6 +51,14 @@ public final class FakeConfig {
     /** OP 可以用 force 跳过所有警告。 */
     public boolean allowForce = true;
 
+    // ---- 自动进食 ----
+    /** 总开关。 */
+    public boolean autoEatEnabled = true;
+    /** 血量低于等于该值就吃（金苹果类）。 */
+    public float autoEatHealth = 8.0F;
+    /** 饱食度低于等于该值就吃。 */
+    public int autoEatFood = 14;
+
     // ---- 指令权限等级（0=普通玩家，2=OP，4=控制台） ----
     public int spawnLevel = 2;
     public int killLevel = 2;

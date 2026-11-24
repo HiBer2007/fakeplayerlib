@@ -163,6 +163,7 @@ public final class FakePlayerFactory {
             lib.untrack(player.getUUID());
         }
         top.hibermod.fakeplayer.FakeInput.forget(player.getUUID());
+        top.hibermod.fakeplayer.FakeAutoEat.forget(player.getUUID());
         boolean done = false;
         if (player.connection != null) {
             try {

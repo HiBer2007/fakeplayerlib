@@ -87,9 +87,12 @@ public final class FakeAction {
             return;
         }
         if (p.useMode != null && due(p.useMode, p.useInterval, p.useNextTick, gameTime)) {
-            p.useNextTick = next(p.useMode, p.useInterval, gameTime);
-            use(player);
-            if (p.useMode == Mode.ONCE) {
+            // 正在使用物品（进食/拉弓/喝药）时不能重复发右键，否则会重置使用进度
+            if (!player.isUsingItem()) {
+                p.useNextTick = next(p.useMode, p.useInterval, gameTime);
+                use(player);
+            }
+            if (p.useMode == Mode.ONCE && !player.isUsingItem()) {
                 p.useMode = null;
             }
         }

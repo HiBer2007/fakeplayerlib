@@ -52,6 +52,7 @@ public class FakeScreen extends Screen {
     private final float maxHealth;
     private final int selected;
     private final int food;
+    private net.minecraft.client.gui.components.EditBox intervalBox;
     private final List<Slot> slots = new ArrayList<>();
 
     private record Slot(int index, String id, int count) {
@@ -130,6 +131,25 @@ public class FakeScreen extends Screen {
         btnY = button(btnX, btnY, bw, "Attack: once", "attack");
         btnY = button(btnX, btnY, bw, "Attack: hold", "attack_continuous");
         btnY = button(btnX, btnY, bw, "Attack: stop", "attack_stop");
+
+        // 间隔执行：输入框 + 两个按钮，等效于 /player <name> use|attack interval <n>
+        intervalBox = new net.minecraft.client.gui.components.EditBox(
+                this.font, btnX, btnY, 46, 18, Component.literal("ticks"));
+        intervalBox.setValue("20");
+        intervalBox.setMaxLength(3);
+        addRenderableWidget(intervalBox);
+        final int labelY = btnY;
+        addRenderableOnly((g, mx, my, pt) -> g.drawString(this.font, "ticks", btnX + 50, labelY + 5, 0xA0A0A0));
+        btnY += 21;
+        addRenderableWidget(Button.builder(Component.literal("Use interval"),
+                b -> runCommand("player " + name + " use interval " + intervalValue()))
+                .bounds(btnX, btnY, bw, 18).build());
+        btnY += 21;
+        addRenderableWidget(Button.builder(Component.literal("Attack interval"),
+                b -> runCommand("player " + name + " attack interval " + intervalValue()))
+                .bounds(btnX, btnY, bw, 18).build());
+        btnY += 21;
+
         btnY = button(btnX, btnY, bw, "Drop inventory", "drop_all");
         btnY += 2;
 
@@ -177,6 +197,24 @@ public class FakeScreen extends Screen {
         if (c != null) {
             c.send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(
                     new FakeActionPayload(body)));
+        }
+    }
+
+    /** 间隔输入框的合法值（1–200 tick，默认 20）。 */
+    private int intervalValue() {
+        try {
+            int v = Integer.parseInt(intervalBox.getValue().trim());
+            return Math.max(1, Math.min(200, v));
+        } catch (Throwable t) {
+            return 20;
+        }
+    }
+
+    /** 直接以玩家身份执行指令（与聊天栏输入完全一致）。 */
+    private void runCommand(String cmd) {
+        var mc = Minecraft.getInstance();
+        if (mc.player != null && mc.player.connection != null) {
+            mc.player.connection.sendCommand(cmd);
         }
     }
 
