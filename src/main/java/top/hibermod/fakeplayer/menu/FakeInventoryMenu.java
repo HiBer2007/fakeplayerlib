@@ -37,9 +37,9 @@ public class FakeInventoryMenu extends AbstractContainerMenu {
     private final ContainerData data;
     private final ContainerLevelAccess access;
 
-    /** 客户端构造：只关心槽位数量与坐标。 */
+    /** 客户端构造：只关心槽位数量与坐标；数据槽必须可写，否则服务端同步过来的值存不住（表现为血量/饱食度恒为 0）。 */
     public FakeInventoryMenu(int id, Inventory viewer) {
-        this(id, viewer, null, new SimpleContainerData0());
+        this(id, viewer, null, new net.minecraft.world.inventory.SimpleContainerData(DATA_SIZE));
     }
 
     /** 服务端构造：槽位绑定真实假人背包。 */

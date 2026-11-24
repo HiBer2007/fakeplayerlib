@@ -73,11 +73,17 @@ public final class FakeClient {
             BlockPos current = BREAKING.get(player.getUUID());
             if (!pos.equals(current)) {
                 stopBreaking(player);
-                player.gameMode.handleBlockBreakAction(pos,
-                        ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
-                        block.getDirection(), player.level().getMaxBuildHeight(),
-                        SEQUENCE.incrementAndGet());
-                BREAKING.put(player.getUUID(), pos);
+            player.gameMode.handleBlockBreakAction(pos,
+                    ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
+                    block.getDirection(), player.level().getMaxBuildHeight(),
+                    SEQUENCE.incrementAndGet());
+            BREAKING.put(player.getUUID(), pos);
+            FakePlayerLib.LOGGER.info(
+                    "[fakeplayerlib] break-start {} pos={} canInteract={} mayInteract={} restricted={}",
+                    player.getGameProfile().getName(), pos,
+                    player.canInteractWithBlock(pos, 1.0),
+                    player.level().mayInteract(player, pos),
+                    player.blockActionRestricted(player.level(), pos, player.gameMode.getGameModeForPlayer()));
             } else if (player.level().isEmptyBlock(pos)) {
                 stopBreaking(player);
             }
@@ -135,8 +141,13 @@ public final class FakeClient {
             // 2) 方块
             HitResult blockHit = player.pick(reach, 0.0F, false);
             if (blockHit.getType() == HitResult.Type.BLOCK) {
-                var r = player.gameMode.useItemOn(player, player.serverLevel(), stack, hand,
-                        (BlockHitResult) blockHit);
+                BlockHitResult bhr = (BlockHitResult) blockHit;
+                var r = player.gameMode.useItemOn(player, player.serverLevel(), stack, hand, bhr);
+                FakePlayerLib.LOGGER.info(
+                        "[fakeplayerlib] use-on {} pos={} result={} dist={} mayInteract={}",
+                        player.getGameProfile().getName(), bhr.getBlockPos(), r,
+                        player.canInteractWithBlock(bhr.getBlockPos(), 1.0),
+                        player.level().mayInteract(player, bhr.getBlockPos()));
                 if (r.consumesAction()) {
                     player.swing(hand, true);
                     return;
