@@ -59,13 +59,12 @@ public final class FakeClient {
     }
 
     /**
-     * 左键。视线命中方块 → 开始挖（服务端 {@code gameMode.tick()} 会推进破坏进度）；
-     * 命中实体 → 攻击；都没命中 → 挥空。
+     * 左键：与原版客户端 {@code MultiPlayerGameMode#attack} 完全相同的入口——
+     * 命中实体直接 {@code player.attack(entity)}；
+     * 命中方块调用 {@code gameMode.handleBlockBreakAction(START_DESTROY_BLOCK)}（破坏进度由
+     * {@code gameMode.tick()} 结算，创造模式即时破坏）。
      */
     public static void leftClick(ServerPlayer player) {
-        if (player.connection == null) {
-            return;
-        }
         double reach = player.gameMode.isCreative() ? 5.0 : 4.5;
         HitResult hit = player.pick(reach, 0.0F, false);
         if (hit.getType() == HitResult.Type.BLOCK) {
@@ -74,12 +73,12 @@ public final class FakeClient {
             BlockPos current = BREAKING.get(player.getUUID());
             if (!pos.equals(current)) {
                 stopBreaking(player);
-                player.connection.handlePlayerAction(new ServerboundPlayerActionPacket(
+                player.gameMode.handleBlockBreakAction(pos,
                         ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
-                        pos, block.getDirection(), SEQUENCE.incrementAndGet()));
+                        block.getDirection(), player.level().getMaxBuildHeight(),
+                        SEQUENCE.incrementAndGet());
                 BREAKING.put(player.getUUID(), pos);
             } else if (player.level().isEmptyBlock(pos)) {
-                // 方块已被挖掉：发一次停止，等下一个目标
                 stopBreaking(player);
             }
             player.swing(InteractionHand.MAIN_HAND, true);
@@ -88,10 +87,8 @@ public final class FakeClient {
         Entity target = rayTarget(player, reach);
         if (target != null) {
             stopBreaking(player);
-            // 实体攻击按原版攻击冷却过滤（与真实客户端一致），否则一 tick 打很多次
             if (player.getAttackStrengthScale(0.5F) >= 0.9F) {
-                player.connection.handleInteract(
-                        ServerboundInteractPacket.createAttackPacket(target, player.isShiftKeyDown()));
+                player.attack(target);
             }
             return;
         }
@@ -99,15 +96,15 @@ public final class FakeClient {
         player.swing(InteractionHand.MAIN_HAND, true);
     }
 
-    /** 结束挖掘（松开左键）。 */
+    /** 松开左键：原版 ABORT_DESTROY_BLOCK。 */
     public static void stopBreaking(ServerPlayer player) {
         BlockPos pos = BREAKING.remove(player.getUUID());
-        if (pos == null || player.connection == null) {
+        if (pos == null) {
             return;
         }
-        player.connection.handlePlayerAction(new ServerboundPlayerActionPacket(
-                ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
-                pos, Direction.DOWN, SEQUENCE.incrementAndGet()));
+        player.gameMode.handleBlockBreakAction(pos,
+                ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK,
+                Direction.DOWN, player.level().getMaxBuildHeight(), SEQUENCE.incrementAndGet());
     }
 
     /**
@@ -153,14 +150,11 @@ public final class FakeClient {
         }
     }
 
-    /** 松开右键：结束进食/拉弓等"使用中"状态（原版 RELEASE_USE_ITEM）。 */
+    /** 松开右键：原版 {@code Player#releaseUsingItem}。 */
     public static void useRelease(ServerPlayer player) {
-        if (player.connection == null || !player.isUsingItem()) {
-            return;
+        if (player.isUsingItem()) {
+            player.releaseUsingItem();
         }
-        player.connection.handlePlayerAction(new ServerboundPlayerActionPacket(
-                ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM,
-                BlockPos.containing(player.position()), Direction.DOWN));
     }
 
     /** Q 键：丢弃手持（单个或整栈）。 */

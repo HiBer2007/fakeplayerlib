@@ -44,6 +44,21 @@ public class FakePlayerLib {
     public record Entry(UUID uuid, String name, FakeConnection connection) {
     }
 
+    /** 假人背包容器类型。 */
+    public static final net.neoforged.neoforge.registries.DeferredRegister<net.minecraft.world.inventory.MenuType<?>> MENUS =
+            net.neoforged.neoforge.registries.DeferredRegister.create(
+                    net.minecraft.core.registries.Registries.MENU, MOD_ID);
+
+    public static final java.util.function.Supplier<net.minecraft.world.inventory.MenuType<top.hibermod.fakeplayer.menu.FakeInventoryMenu>> FAKE_INVENTORY_MENU =
+            MENUS.register("fake_inventory", () -> net.neoforged.neoforge.common.extensions.IMenuTypeExtension.create(
+                    (id, inv, buf) -> {
+                        int entityId = buf.readVarInt();
+                        net.minecraft.world.entity.player.Player fake =
+                                inv.player.level().getEntity(entityId) instanceof net.minecraft.server.level.ServerPlayer sp
+                                        ? sp : null;
+                        return new top.hibermod.fakeplayer.menu.FakeInventoryMenu(id, inv, fake);
+                    }));
+
     public FakePlayerLib(IEventBus modBus, ModContainer container) {
         instance = this;
         var bus = NeoForge.EVENT_BUS;
@@ -52,13 +67,14 @@ public class FakePlayerLib {
         if (net.neoforged.fml.loading.FMLEnvironment.dist
                 == net.neoforged.api.distmarker.Dist.CLIENT) {
             bus.addListener(top.hibermod.fakeplayer.client.ClientSetup::registerClientCommands);
-            top.hibermod.fakeplayer.client.ClientSetup.registerPreviewHook();
+            modBus.addListener(top.hibermod.fakeplayer.client.ClientSetup::registerScreens);
         }
         bus.addListener(this::onTick);
         bus.addListener(this::onStopping);
         bus.addListener(this::onServerStarted);
         bus.addListener(this::onLivingDeath);
         bus.addListener(this::onPlayerLogin);
+        MENUS.register(modBus);
         bus.addListener(top.hibermod.fakeplayer.gui.FakeGuiServer::onEntityInteract);
         modBus.addListener(FakePlayerLib::onRegisterPayloads);
     }
@@ -104,12 +120,6 @@ public class FakePlayerLib {
                 top.hibermod.fakeplayer.net.FakeActionPayload.STREAM_CODEC,
                 (payload, ctx) -> ctx.enqueueWork(
                         () -> top.hibermod.fakeplayer.gui.FakeGuiServer.onAction(payload, ctx)));
-
-        // 客户端专属的 S2C 处理器只在客户端注册
-        if (net.neoforged.fml.loading.FMLEnvironment.dist
-                == net.neoforged.api.distmarker.Dist.CLIENT) {
-            top.hibermod.fakeplayer.client.ClientSetup.registerClient(registrar);
-        }
     }
 
     private void onServerStarted(
@@ -264,10 +274,7 @@ public class FakePlayerLib {
                 FakeAction.tick(p, gameTime);
             }
         }
-        // 面板实时刷新：每 10 tick 推送一次，快捷栏选中/背包变化立刻可见
-        if (event.getServer().getTickCount() % 10 == 0) {
-            top.hibermod.fakeplayer.gui.FakeGuiServer.refreshAll(event.getServer());
-        }
+        // 容器界面的同步由原版容器协议完成，不需要任何快照刷新
         // 自动进食对每个活跃假人生效（不受动作包影响）
         for (Entry e : fakes.values()) {
             ServerPlayer p = event.getServer().getPlayerList().getPlayer(e.uuid());
