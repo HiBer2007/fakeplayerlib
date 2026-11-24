@@ -98,7 +98,12 @@ public final class PlayerCommand {
                         .requires(s -> perm(s, FakeConfig.Action.USE))
                         .then(Commands.argument("n", IntegerArgumentType.integer(1, 9))
                                 .executes(c -> hotbar(c.getSource(), name(c),
-                                        IntegerArgumentType.getInteger(c, "n"))))));
+                                        IntegerArgumentType.getInteger(c, "n")))))
+                .then(Commands.literal("fly")
+                        .requires(s -> perm(s, FakeConfig.Action.MOVE))
+                        .executes(c -> fly(c.getSource(), name(c)))
+                        .then(Commands.literal("on").executes(c -> fly2(c.getSource(), name(c), true)))
+                        .then(Commands.literal("off").executes(c -> fly2(c.getSource(), name(c), false)))));
         d.register(root);
     }
 
@@ -365,6 +370,37 @@ public final class PlayerCommand {
         }
         p.getInventory().selected = n - 1;
         ok(src, "§a" + name + " hotbar slot = " + n);
+        return 1;
+    }
+
+    /** 切换飞行：等价于双击空格（要求创造模式或已有 mayfly 权限）。 */
+    private static int fly(CommandSourceStack src, String name) {
+        ServerPlayer p = target(src, name, false, "fly");
+        if (p == null) {
+            return 0;
+        }
+        if (!p.getAbilities().mayfly) {
+            src.sendFailure(Component.literal("§c" + name + " cannot fly (creative / mayfly required)"));
+            return 0;
+        }
+        p.getAbilities().flying = !p.getAbilities().flying;
+        p.onUpdateAbilities();
+        ok(src, "§a" + name + " flying = " + p.getAbilities().flying);
+        return 1;
+    }
+
+    private static int fly2(CommandSourceStack src, String name, boolean on) {
+        ServerPlayer p = target(src, name, false, "fly");
+        if (p == null) {
+            return 0;
+        }
+        if (on && !p.getAbilities().mayfly) {
+            src.sendFailure(Component.literal("§c" + name + " cannot fly"));
+            return 0;
+        }
+        p.getAbilities().flying = on;
+        p.onUpdateAbilities();
+        ok(src, "§a" + name + " flying = " + on);
         return 1;
     }
 

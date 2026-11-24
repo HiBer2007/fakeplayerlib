@@ -78,7 +78,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
                     .bounds(col2 + (i - 1) * 12, c2y, 11, 18).build());
         }
         c2y += row;
-        c2y = button(col2, c2y, w, "fakeplayerlib.gui.bring", "bring");
+        c2y = button(col2, c2y, w, "fakeplayerlib.gui.fly", "fly");
         c2y = button(col2, c2y, w, "fakeplayerlib.gui.tp", "tp_to");
         c2y = button(col2, c2y, w, "fakeplayerlib.gui.refresh", "refresh");
         button(col2, c2y, w, "fakeplayerlib.gui.remove", "kill");
@@ -122,6 +122,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
             case "attack_stop" -> "player " + name + " attack stop";
             case "drop_all" -> "player " + name + " drop all";
             case "kill" -> "player " + name + " kill";
+            case "fly" -> "player " + name + " fly";
             default -> null;
         };
         if (cmd != null) {

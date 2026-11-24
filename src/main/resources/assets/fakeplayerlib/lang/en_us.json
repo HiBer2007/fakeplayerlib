@@ -14,5 +14,6 @@
   "fakeplayerlib.gui.tp": "Teleport to",
   "fakeplayerlib.gui.refresh": "Refresh",
   "fakeplayerlib.gui.remove": "Remove",
-  "fakeplayerlib.gui.ticks": "ticks"
+  "fakeplayerlib.gui.ticks": "ticks",
+  "fakeplayerlib.gui.fly": "Toggle flight"
 }

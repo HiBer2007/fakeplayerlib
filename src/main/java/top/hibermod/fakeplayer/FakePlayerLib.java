@@ -116,8 +116,7 @@ public class FakePlayerLib {
             net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent event) {
         var registrar = event.registrar("1");
         LimboLink.register(registrar);
-        registrar.playToServer(top.hibermod.fakeplayer.net.FakeActionPayload.TYPE,
-                top.hibermod.fakeplayer.net.FakeActionPayload.STREAM_CODEC,
+        registrar.playToServer(top.hibermod.fakeplayer.net.FakeActionPayload.TYPE,                top.hibermod.fakeplayer.net.FakeActionPayload.STREAM_CODEC,
                 (payload, ctx) -> ctx.enqueueWork(
                         () -> top.hibermod.fakeplayer.gui.FakeGuiServer.onAction(payload, ctx)));
     }

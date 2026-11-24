@@ -14,5 +14,6 @@
   "fakeplayerlib.gui.tp": "传送到假人",
   "fakeplayerlib.gui.refresh": "刷新",
   "fakeplayerlib.gui.remove": "移除假人",
-  "fakeplayerlib.gui.ticks": "刻"
+  "fakeplayerlib.gui.ticks": "刻",
+  "fakeplayerlib.gui.fly": "切换飞行"
 }

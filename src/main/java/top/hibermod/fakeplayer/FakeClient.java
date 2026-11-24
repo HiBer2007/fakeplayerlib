@@ -40,8 +40,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class FakeClient {
 
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
-    /** 每个假人正在挖的方块（UUID → BlockPos）。 */
+    /** 每个假人正在挖的方块及已挖 tick 数。 */
     private static final Map<UUID, BlockPos> BREAKING = new HashMap<>();
+    private static final Map<UUID, Integer> BREAK_TICKS = new HashMap<>();
 
     private FakeClient() {
     }
@@ -86,6 +87,21 @@ public final class FakeClient {
                     player.blockActionRestricted(player.level(), pos, player.gameMode.getGameModeForPlayer()));
             } else if (player.level().isEmptyBlock(pos)) {
                 stopBreaking(player);
+            } else {
+                // 原版：进度由 gameMode.tick() 累积，但**结算破坏要客户端发 STOP_DESTROY_BLOCK**。
+                // incrementDestroyProgress 只负责发进度包，不会 destroyBlock —— 之前只发 START，
+                // 所以生存模式永远挖不掉（创造模式走即时破坏，不受影响）。
+                int ticks = BREAK_TICKS.merge(player.getUUID(), 1, Integer::sum);
+                float progress = player.level().getBlockState(pos)
+                        .getDestroyProgress(player, player.level(), pos) * ticks;
+                if (progress >= 1.0F) {
+                    player.gameMode.handleBlockBreakAction(pos,
+                            ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
+                            block.getDirection(), player.level().getMaxBuildHeight(),
+                            SEQUENCE.incrementAndGet());
+                    BREAKING.remove(player.getUUID());
+                    BREAK_TICKS.remove(player.getUUID());
+                }
             }
             player.swing(InteractionHand.MAIN_HAND, true);
             return;
@@ -105,6 +121,7 @@ public final class FakeClient {
     /** 松开左键：原版 ABORT_DESTROY_BLOCK。 */
     public static void stopBreaking(ServerPlayer player) {
         BlockPos pos = BREAKING.remove(player.getUUID());
+        BREAK_TICKS.remove(player.getUUID());
         if (pos == null) {
             return;
         }

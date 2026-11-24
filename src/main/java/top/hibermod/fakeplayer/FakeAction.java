@@ -91,9 +91,11 @@ public final class FakeAction {
             if (!player.isUsingItem()) {
                 p.useNextTick = next(p.useMode, p.useInterval, gameTime);
                 use(player);
-            }
-            if (p.useMode == Mode.ONCE && !player.isUsingItem()) {
-                p.useMode = null;
+                // ONCE 在"按下"这一刻就结束：不能等 isUsingItem 变假，
+                // 否则吃完一个立刻又按一次，变成无限进食
+                if (p.useMode == Mode.ONCE) {
+                    p.useMode = null;
+                }
             }
         }
         if (p.attackMode != null && due(p.attackMode, p.attackInterval, p.attackNextTick, gameTime)) {
