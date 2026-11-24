@@ -119,6 +119,11 @@ public class FakePlayerLib {
         registrar.playToServer(top.hibermod.fakeplayer.net.FakeActionPayload.TYPE,                top.hibermod.fakeplayer.net.FakeActionPayload.STREAM_CODEC,
                 (payload, ctx) -> ctx.enqueueWork(
                         () -> top.hibermod.fakeplayer.gui.FakeGuiServer.onAction(payload, ctx)));
+        // 假人实时状态（HP/饱食度/快捷栏选中/飞行）→ 客户端容器界面
+        registrar.playToClient(top.hibermod.fakeplayer.net.FakeStatePayload.TYPE,
+                top.hibermod.fakeplayer.net.FakeStatePayload.STREAM_CODEC,
+                (payload, ctx) -> ctx.enqueueWork(
+                        () -> top.hibermod.fakeplayer.client.ClientSetup.onState(payload)));
     }
 
     private void onServerStarted(
@@ -273,7 +278,8 @@ public class FakePlayerLib {
                 FakeAction.tick(p, gameTime);
             }
         }
-        // 容器界面的同步由原版容器协议完成，不需要任何快照刷新
+        // 容器界面的物品由原版容器协议同步；HP/饱食度/选中槽只在变化时下发
+        top.hibermod.fakeplayer.gui.FakeGuiServer.sendStates(event.getServer());
         // 自动进食对每个活跃假人生效（不受动作包影响）
         for (Entry e : fakes.values()) {
             ServerPlayer p = event.getServer().getPlayerList().getPlayer(e.uuid());

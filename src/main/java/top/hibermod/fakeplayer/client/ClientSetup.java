@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import top.hibermod.fakeplayer.FakePlayerLib;
+import top.hibermod.fakeplayer.net.FakeStatePayload;
 
 /**
  * 客户端接线。
@@ -19,6 +20,14 @@ public final class ClientSetup {
     /** 容器界面注册（mod bus）。 */
     public static void registerScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
         event.register(FakePlayerLib.FAKE_INVENTORY_MENU.get(), FakeInventoryScreen::new);
+    }
+
+    /** 假人状态（HP / 饱食度 / 快捷栏选中 / 飞行）到达客户端。 */
+    public static void onState(FakeStatePayload payload) {
+        FakeInventoryScreen screen = FakeInventoryScreen.current();
+        if (screen != null) {
+            screen.applyState(payload);
+        }
     }
 
     /**

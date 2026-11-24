@@ -42,12 +42,65 @@ public final class FakeGuiServer {
         open(player, target);
     }
 
+    /** 观察者 → 假人（面板打开期间记录），只用于状态下发。 */
+    private static final java.util.Map<java.util.UUID, java.util.UUID> VIEWERS = new java.util.HashMap<>();
+    /** 上次下发的状态，用于"只在变化时发送"。 */
+    private static final java.util.Map<java.util.UUID, int[]> LAST_STATE = new java.util.HashMap<>();
+
     /** 打开容器：标题用假人名字，客户端界面据此执行对应指令。 */
     public static void open(ServerPlayer viewer, ServerPlayer fake) {
+        VIEWERS.put(viewer.getUUID(), fake.getUUID());
+        LAST_STATE.remove(viewer.getUUID());
         viewer.openMenu(new net.minecraft.world.SimpleMenuProvider(
                         (id, inv, p) -> new FakeInventoryMenu(id, inv, fake),
                         Component.literal(fake.getGameProfile().getName())),
                 buf -> buf.writeVarInt(fake.getId()));
+        // 立刻推一次，避免刚打开时显示占位值
+        push(viewer, fake);
+    }
+
+    /** 每 tick 调用：只在假人状态发生变化时下发（不轮询展示、不过期）。 */
+    public static void sendStates(net.minecraft.server.MinecraftServer server) {
+        if (VIEWERS.isEmpty()) {
+            return;
+        }
+        var it = VIEWERS.entrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            ServerPlayer viewer = server.getPlayerList().getPlayer(e.getKey());
+            ServerPlayer fake = server.getPlayerList().getPlayer(e.getValue());
+            if (viewer == null || fake == null
+                    || !(viewer.containerMenu instanceof FakeInventoryMenu)) {
+                it.remove();
+                LAST_STATE.remove(e.getKey());
+                continue;
+            }
+            int[] now = stateOf(fake);
+            int[] last = LAST_STATE.get(e.getKey());
+            if (last != null && java.util.Arrays.equals(last, now)) {
+                continue;
+            }
+            LAST_STATE.put(e.getKey(), now);
+            push(viewer, fake);
+        }
+    }
+
+    private static int[] stateOf(ServerPlayer fake) {
+        return new int[]{
+                fake.getInventory().selected,
+                fake.getFoodData().getFoodLevel(),
+                (int) fake.getHealth(),
+                fake.getAbilities().flying ? 1 : 0};
+    }
+
+    private static void push(ServerPlayer viewer, ServerPlayer fake) {
+        int[] s = stateOf(fake);
+        try {
+            viewer.connection.send(new top.hibermod.fakeplayer.net.FakeStatePayload(
+                    fake.getGameProfile().getName(), s[0], s[1], s[2], s[3] == 1));
+        } catch (Throwable t) {
+            FakePlayerLib.LOGGER.debug("[fakeplayerlib] state push failed: {}", t.toString());
+        }
     }
 
     /** 仅剩的 payload 动作（没有对应指令的辅助操作）。 */
