@@ -120,6 +120,10 @@ public class FakeScreen extends Screen {
         int bw = 108;
         int row = 21;
 
+        // 面板与按钮必须同属一层：作为 Renderable 注册，按加入顺序先画面板、后画按钮。
+        // 之前把面板直接画在 Screen#render 里，和 renderables 层不同，会被整层虚化。
+        this.addRenderableOnly(new PanelRenderable());
+
         btnY = button(btnX, btnY, bw, "Use: once", "use");
         btnY = button(btnX, btnY, bw, "Use: hold", "use_continuous");
         btnY = button(btnX, btnY, bw, "Use: stop", "use_stop");
@@ -159,14 +163,33 @@ public class FakeScreen extends Screen {
         }
     }
 
-    @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        // 不用 renderBackground：它会在我们绘制之后叠加一次模糊后处理，
-        // 导致左侧容器面板发虚、和右侧按钮不在同一层（点击也会错位）。
-        // 这里自绘一层暗色遮罩，整屏保证只有一层绘制。
-        g.fill(0, 0, this.width, this.height, 0xC0101010);
+    /** 面板与按钮同层的包装：{@code addRenderableOnly} 要求 Renderable + NarratableEntry。 */
+    private final class PanelRenderable implements
+            net.minecraft.client.gui.components.Renderable,
+            net.minecraft.client.gui.narration.NarratableEntry {
+
+        @Override
+        public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+            renderPanel(g);
+        }
+
+        @Override
+        public net.minecraft.client.gui.narration.NarratableEntry.NarrationPriority narrationPriority() {
+            return net.minecraft.client.gui.narration.NarratableEntry.NarrationPriority.NONE;
+        }
+
+        @Override
+        public void updateNarration(net.minecraft.client.gui.narration.NarrationElementOutput out) {
+            // 只读面板，无需朗读
+        }
+    }
+
+    /** 面板本体：与按钮同层的 renderable（由 init() 注册）。 */
+    private void renderPanel(GuiGraphics g) {
         int left = guiLeft();
         int top = guiTop();
+        // 遮罩也画在同一层，避免出现"半透明层 + 实体层"的双层虚化
+        g.fill(0, 0, this.width, this.height, 0xC0101010);
 
         // 左侧容器面板：自绘（原版容器底色 + 边框），与右侧按钮处在同一绘制层。
         // 之前用 inventory.png 贴图做底板，实际画面上底板完全不可见，故改为纯绘制。
@@ -220,14 +243,7 @@ public class FakeScreen extends Screen {
         g.drawString(this.font, String.format("§8HP %.1f/%.1f  Food %d", health, maxHealth, food),
                 left + 8, top + 170, 0x404040);
         g.drawString(this.font, "§8" + dim, left + 8, top + 180, 0x707070);
-
-        // 先把面板几何真正提交到 GPU。
-        // 不 flush 时的症状：面板被上一帧遗留的模糊后处理盖住，看着发虚、像在另一层。
-        g.flush();
-        super.render(g, mouseX, mouseY, partialTick);
-    }
-
-    /** 原版风格的 18×18 槽位。 */
+    }    /** 原版风格的 18×18 槽位。 */
     private void drawSlot(GuiGraphics g, int x, int y) {
         g.fill(x, y, x + 18, y + 18, 0xFF8B8B8B);            // 槽底
         g.fill(x, y, x + 18, y + 1, 0xFF373737);             // 上/左边框
