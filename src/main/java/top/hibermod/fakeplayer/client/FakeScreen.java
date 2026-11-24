@@ -155,12 +155,47 @@ public class FakeScreen extends Screen {
         return y + 21;
     }
 
+    /**
+     * 面板按钮 = 命令。
+     *
+     * <p>所有按钮都翻译成真正的 {@code /player ...} 指令交给服务端执行（走
+     * {@code ClientPacketListener.sendCommand}，即玩家在聊天栏敲命令那条路径），
+     * 因此 GUI 与指令的行为、权限、返回值完全一致，不存在两套实现。
+     * 只有服务端没有对应指令的辅助动作（bring/tp/refresh）才回退到 payload。
+     */
     private void send(String body) {
-        var c = Minecraft.getInstance().getConnection();
+        var mc = Minecraft.getInstance();
+        if (mc.player == null || mc.player.connection == null) {
+            return;
+        }
+        String cmd = toCommand(body);
+        if (cmd != null) {
+            mc.player.connection.sendCommand(cmd);
+            return;
+        }
+        var c = mc.getConnection();
         if (c != null) {
             c.send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(
                     new FakeActionPayload(body)));
         }
+    }
+
+    /** 面板动作 → 等价指令；返回 null 表示没有对应指令。 */
+    private String toCommand(String body) {
+        String[] p = body.split("\\|");
+        String action = p[0];
+        return switch (action) {
+            case "use" -> "player " + name + " use once";
+            case "use_continuous" -> "player " + name + " use continuous";
+            case "use_stop" -> "player " + name + " use stop";
+            case "attack" -> "player " + name + " attack once";
+            case "attack_continuous" -> "player " + name + " attack continuous";
+            case "attack_stop" -> "player " + name + " attack stop";
+            case "drop_all" -> "player " + name + " drop all";
+            case "hotbar" -> p.length > 2 ? "player " + name + " hotbar " + p[2] : null;
+            case "kill" -> "player " + name + " kill";
+            default -> null;
+        };
     }
 
     /** 面板与按钮同层的包装：{@code addRenderableOnly} 要求 Renderable + NarratableEntry。 */
