@@ -1,0 +1,18 @@
+{
+  "fakeplayerlib.gui.title": "Fake Player",
+  "fakeplayerlib.gui.use_once": "Use: once",
+  "fakeplayerlib.gui.use_hold": "Use: hold",
+  "fakeplayerlib.gui.use_stop": "Use: stop",
+  "fakeplayerlib.gui.attack_once": "Attack: once",
+  "fakeplayerlib.gui.attack_hold": "Attack: hold",
+  "fakeplayerlib.gui.attack_stop": "Attack: stop",
+  "fakeplayerlib.gui.use_interval": "Use interval",
+  "fakeplayerlib.gui.attack_interval": "Attack interval",
+  "fakeplayerlib.gui.drop": "Drop inventory",
+  "fakeplayerlib.gui.hotbar": "Hotbar",
+  "fakeplayerlib.gui.bring": "Bring here",
+  "fakeplayerlib.gui.tp": "Teleport to",
+  "fakeplayerlib.gui.refresh": "Refresh",
+  "fakeplayerlib.gui.remove": "Remove",
+  "fakeplayerlib.gui.ticks": "ticks"
+}

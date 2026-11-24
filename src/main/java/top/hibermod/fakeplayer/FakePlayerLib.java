@@ -264,6 +264,10 @@ public class FakePlayerLib {
                 FakeAction.tick(p, gameTime);
             }
         }
+        // 面板实时刷新：每 10 tick 推送一次，快捷栏选中/背包变化立刻可见
+        if (event.getServer().getTickCount() % 10 == 0) {
+            top.hibermod.fakeplayer.gui.FakeGuiServer.refreshAll(event.getServer());
+        }
         // 自动进食对每个活跃假人生效（不受动作包影响）
         for (Entry e : fakes.values()) {
             ServerPlayer p = event.getServer().getPlayerList().getPlayer(e.uuid());

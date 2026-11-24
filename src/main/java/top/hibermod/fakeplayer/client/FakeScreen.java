@@ -119,38 +119,41 @@ public class FakeScreen extends Screen {
         int btnX = left + 176 + 10;
         int btnY = top + 2;
         int bw = 108;
-        int row = 21;
+        int row = 17;
 
         // 面板与按钮必须同属一层：作为 Renderable 注册，按加入顺序先画面板、后画按钮。
         // 之前把面板直接画在 Screen#render 里，和 renderables 层不同，会被整层虚化。
         this.addRenderableOnly(new PanelRenderable());
 
-        btnY = button(btnX, btnY, bw, "Use: once", "use");
-        btnY = button(btnX, btnY, bw, "Use: hold", "use_continuous");
-        btnY = button(btnX, btnY, bw, "Use: stop", "use_stop");
-        btnY = button(btnX, btnY, bw, "Attack: once", "attack");
-        btnY = button(btnX, btnY, bw, "Attack: hold", "attack_continuous");
-        btnY = button(btnX, btnY, bw, "Attack: stop", "attack_stop");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.use_once", "use");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.use_hold", "use_continuous");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.use_stop", "use_stop");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.attack_once", "attack");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.attack_hold", "attack_continuous");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.attack_stop", "attack_stop");
 
         // 间隔执行：输入框 + 两个按钮，等效于 /player <name> use|attack interval <n>
         intervalBox = new net.minecraft.client.gui.components.EditBox(
-                this.font, btnX, btnY, 46, 18, Component.literal("ticks"));
+                this.font, btnX, btnY, 46, 16,
+                Component.translatable("fakeplayerlib.gui.ticks"));
         intervalBox.setValue("20");
         intervalBox.setMaxLength(3);
         addRenderableWidget(intervalBox);
         final int labelY = btnY;
-        addRenderableOnly((g, mx, my, pt) -> g.drawString(this.font, "ticks", btnX + 50, labelY + 5, 0xA0A0A0));
-        btnY += 21;
-        addRenderableWidget(Button.builder(Component.literal("Use interval"),
+        addRenderableOnly((g, mx, my, pt) -> g.drawString(this.font,
+                Component.translatable("fakeplayerlib.gui.ticks").getString(),
+                btnX + 50, labelY + 5, 0xA0A0A0));
+        btnY += 17;
+        addRenderableWidget(Button.builder(Component.translatable("fakeplayerlib.gui.use_interval"),
                 b -> runCommand("player " + name + " use interval " + intervalValue()))
-                .bounds(btnX, btnY, bw, 18).build());
-        btnY += 21;
-        addRenderableWidget(Button.builder(Component.literal("Attack interval"),
+                .bounds(btnX, btnY, bw, 16).build());
+        btnY += 17;
+        addRenderableWidget(Button.builder(Component.translatable("fakeplayerlib.gui.attack_interval"),
                 b -> runCommand("player " + name + " attack interval " + intervalValue()))
-                .bounds(btnX, btnY, bw, 18).build());
-        btnY += 21;
+                .bounds(btnX, btnY, bw, 16).build());
+        btnY += 17;
 
-        btnY = button(btnX, btnY, bw, "Drop inventory", "drop_all");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.drop", "drop_all");
         btnY += 2;
 
         // 快捷栏选择：9 个紧凑格子
@@ -159,20 +162,21 @@ public class FakeScreen extends Screen {
             final int slot = i;
             addRenderableWidget(Button.builder(Component.literal(String.valueOf(i)),
                             b -> send("hotbar|" + name + "|" + slot))
-                    .bounds(hbX + (i - 1) * 12, btnY, 12, 16).build());
+                    .bounds(hbX + (i - 1) * 12, btnY, 12, 14).build());
         }
         btnY += row + 2;
 
-        btnY = button(btnX, btnY, bw, "Bring here", "bring");
-        btnY = button(btnX, btnY, bw, "Teleport to", "tp_to");
-        btnY = button(btnX, btnY, bw, "Refresh", "refresh");
-        button(btnX, btnY, bw, "Remove", "kill");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.bring", "bring");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.tp", "tp_to");
+        btnY = button(btnX, btnY, bw, "fakeplayerlib.gui.refresh", "refresh");
+        button(btnX, btnY, bw, "fakeplayerlib.gui.remove", "kill");
     }
 
-    private int button(int x, int y, int w, String label, String action) {
-        addRenderableWidget(Button.builder(Component.literal(label),
-                b -> send(action + "|" + name)).bounds(x, y, w, 18).build());
-        return y + 21;
+    /** label 传翻译键，按钮文字跟随客户端语言（中/英）。 */
+    private int button(int x, int y, int w, String translationKey, String action) {
+        addRenderableWidget(Button.builder(Component.translatable(translationKey),
+                b -> send(action + "|" + name)).bounds(x, y, w, 16).build());
+        return y + 17;
     }
 
     /**

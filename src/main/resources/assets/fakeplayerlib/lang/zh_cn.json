@@ -1,0 +1,18 @@
+{
+  "fakeplayerlib.gui.title": "假人控制面板",
+  "fakeplayerlib.gui.use_once": "使用：一次",
+  "fakeplayerlib.gui.use_hold": "使用：按住",
+  "fakeplayerlib.gui.use_stop": "使用：停止",
+  "fakeplayerlib.gui.attack_once": "攻击：一次",
+  "fakeplayerlib.gui.attack_hold": "攻击：按住",
+  "fakeplayerlib.gui.attack_stop": "攻击：停止",
+  "fakeplayerlib.gui.use_interval": "按间隔使用",
+  "fakeplayerlib.gui.attack_interval": "按间隔攻击",
+  "fakeplayerlib.gui.drop": "丢出全部物品",
+  "fakeplayerlib.gui.hotbar": "快捷栏",
+  "fakeplayerlib.gui.bring": "传送到我身边",
+  "fakeplayerlib.gui.tp": "传送到假人",
+  "fakeplayerlib.gui.refresh": "刷新",
+  "fakeplayerlib.gui.remove": "移除假人",
+  "fakeplayerlib.gui.ticks": "刻"
+}

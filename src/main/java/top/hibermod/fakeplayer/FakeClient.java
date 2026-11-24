@@ -9,6 +9,7 @@ import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 
@@ -109,33 +110,46 @@ public final class FakeClient {
                 pos, Direction.DOWN, SEQUENCE.incrementAndGet()));
     }
 
-    /** 右键：方块 → 实体 → 物品，顺序与原版客户端一致。 */
+    /**
+     * 右键：严格按原版 {@code Minecraft.startUseItem()} 的顺序与回退规则执行。
+     *
+     * <p>顺序是 <b>实体优先 → 方块 → 物品</b>，而且前一步没有"消费"这次交互时才继续下一步。
+     * 之前只发一组包就直接 return，导致手里拿着可投掷物/食物对着方块时，
+     * 服务端先收到 UseItemOn（对该方块无效果），而 UseItem 永远发不出去 ——
+     * 表现就是"对着地面只会执行空操作，必须对着空气才正常"。
+     *
+     * <p>这里直接调用服务端的原生方法并读取返回值，不猜结果：
+     * {@code player.interactOn} / {@code gameMode.useItemOn} / {@code gameMode.useItem}。
+     */
     public static void use(ServerPlayer player) {
         InteractionHand hand = InteractionHand.MAIN_HAND;
+        ItemStack stack = player.getMainHandItem();
         double reach = player.gameMode.isCreative() ? 5.0 : 4.5;
-        if (player.connection == null) {
-            return;
-        }
         try {
-            HitResult hit = player.pick(reach, 0.0F, false);
-            if (hit.getType() == HitResult.Type.BLOCK) {
-                player.connection.handleUseItemOn(new ServerboundUseItemOnPacket(
-                        hand, (BlockHitResult) hit, SEQUENCE.incrementAndGet()));
-                player.swing(hand, true);
-                return;
+            // 1) 实体优先（原版 hitResult 可能命中实体）
+            Entity entity = rayTarget(player, reach);
+            if (entity != null) {
+                var r = player.interactOn(entity, hand);
+                if (r.consumesAction()) {
+                    player.swing(hand, true);
+                    return;
+                }
             }
-            Entity target = rayTarget(player, reach);
-            if (target != null) {
-                player.connection.handleInteract(ServerboundInteractPacket.createInteractionPacket(
-                        target, player.isShiftKeyDown(), hand));
-                player.swing(hand, true);
-                return;
+            // 2) 方块
+            HitResult blockHit = player.pick(reach, 0.0F, false);
+            if (blockHit.getType() == HitResult.Type.BLOCK) {
+                var r = player.gameMode.useItemOn(player, player.serverLevel(), stack, hand,
+                        (BlockHitResult) blockHit);
+                if (r.consumesAction()) {
+                    player.swing(hand, true);
+                    return;
+                }
             }
-            player.connection.handleUseItem(new ServerboundUseItemPacket(
-                    hand, SEQUENCE.incrementAndGet(), player.getYRot(), player.getXRot()));
+            // 3) 物品本身（投掷物/食物/拉弓）——前两步没有消费才走到这里
+            player.gameMode.useItem(player, player.serverLevel(), stack, hand);
             player.swing(hand, true);
         } catch (Throwable t) {
-            FakePlayerLib.LOGGER.warn("[fakeplayerlib] use packet failed: {}", t.toString());
+            FakePlayerLib.LOGGER.warn("[fakeplayerlib] use failed: {}", t.toString());
         }
     }
 

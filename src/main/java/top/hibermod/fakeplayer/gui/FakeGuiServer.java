@@ -42,13 +42,61 @@ public final class FakeGuiServer {
         send(player, target);
     }
 
+    /** 打开面板的观察者 → 假人（key=观察者 UUID），用于实时刷新。 */
+    private static final java.util.Map<java.util.UUID, java.util.UUID> VIEWERS = new java.util.HashMap<>();
+    /** 观察者最后一次打开/刷新时的 tick，用于过期回收。 */
+    private static final java.util.Map<java.util.UUID, Long> VIEWER_SEEN = new java.util.HashMap<>();
+
     public static void send(ServerPlayer viewer, ServerPlayer fake) {
         String json = buildJson(fake);
         try {
             viewer.connection.send(new FakeGuiPayload(json));
+            VIEWERS.put(viewer.getUUID(), fake.getUUID());
+            VIEWER_SEEN.put(viewer.getUUID(), (long) viewer.server.getTickCount());
         } catch (Throwable t) {
             FakePlayerLib.LOGGER.warn("[fakeplayerlib] failed to send fake player panel: {}", t.toString());
         }
+    }
+
+    /**
+     * 面板打开期间推送最新内容（快捷栏选中、背包变化都能实时反映）。
+     * 由 {@link FakePlayerLib} 每 10 tick 调一次；600 tick 未再打开则停止推送。
+     */
+    public static void refreshAll(net.minecraft.server.MinecraftServer server) {
+        if (VIEWERS.isEmpty()) {
+            return;
+        }
+        long now = server.getTickCount();
+        var it = VIEWERS.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            java.util.UUID viewerId = entry.getKey();
+            long seen = VIEWER_SEEN.getOrDefault(viewerId, now);
+            if (now - seen > 600) {
+                it.remove();
+                VIEWER_SEEN.remove(viewerId);
+                continue;
+            }
+            ServerPlayer viewer = server.getPlayerList().getPlayer(viewerId);
+            ServerPlayer fake = server.getPlayerList().getPlayer(entry.getValue());
+            if (viewer == null || fake == null) {
+                it.remove();
+                VIEWER_SEEN.remove(viewerId);
+                continue;
+            }
+            try {
+                viewer.connection.send(new FakeGuiPayload(buildJson(fake)));
+            } catch (Throwable ignored) {
+                it.remove();
+                VIEWER_SEEN.remove(viewerId);
+            }
+        }
+    }
+
+    /** 关闭面板：停止推送。 */
+    public static void forgetViewer(java.util.UUID viewerId) {
+        VIEWERS.remove(viewerId);
+        VIEWER_SEEN.remove(viewerId);
     }
 
     private static String buildJson(ServerPlayer fake) {
