@@ -42,6 +42,8 @@ public class FakeServerPlayer extends ServerPlayer {
             super.tick();
             this.doTick();
             FakeInput.tick(this);
+            // 虚拟客户端：每 tick 像真客户端一样上报位置/朝向
+            FakeClient.tick(this);
         } catch (NullPointerException ignored) {
             // 与 Carpet 相同的兜底：某些环境下连接字段缺失会抛 NPE，
             // 吞掉比让整个服务端崩掉好

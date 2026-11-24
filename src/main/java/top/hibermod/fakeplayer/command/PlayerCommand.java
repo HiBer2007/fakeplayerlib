@@ -337,7 +337,8 @@ public final class PlayerCommand {
         if (slot == -1) {
             p.getInventory().clearContent();
         } else if (slot == -2) {
-            p.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            // 走原版 DROP_ITEM 动作包（等价于客户端按 Q），而不是直接清手
+            top.hibermod.fakeplayer.FakeClient.drop(p, false);
         } else {
             p.getInventory().removeItem(slot, p.getInventory().getItem(slot).getCount());
         }

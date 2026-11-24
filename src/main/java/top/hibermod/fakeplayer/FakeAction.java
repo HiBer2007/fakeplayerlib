@@ -104,14 +104,9 @@ public final class FakeAction {
             p.attackNextTick = next(p.attackMode, p.attackInterval, gameTime);
             Entity target = nearestTarget(player);
             if (target != null) {
-                Vec3 before = target.getDeltaMovement();
-                top.hibermod.fakeplayer.FakeInput.attack(player, target);
-                if (gameTime % 20 == 0) {
-                    FakePlayerLib.LOGGER.info(
-                            "[fakeplayerlib] attack diag: charge={} sprint={} hurt={} targetDelta={} -> {}",
-                            charge, player.isSprinting(), target.isAlive(),
-                            before, target.getDeltaMovement());
-                }
+                // 走虚拟客户端的原版交互包：服务端做距离校验后调用 player.attack，
+                // 模组对 handleInteract 的改动自然生效
+                top.hibermod.fakeplayer.FakeClient.attack(player, target);
             } else {
                 player.swing(InteractionHand.MAIN_HAND, true);
             }
@@ -139,42 +134,13 @@ public final class FakeAction {
     }
 
     /**
-     * 一次"右键"：与客户端 {@code Minecraft.startUseItem()} 的判定顺序一致。
-     *
-     * <ol>
-     *   <li>沿视线做方块射线（{@code pick(reach, 0, false)}）；命中方块 →
-     *       {@code gameMode.useItemOn(...)}（这就是放置方块/开箱子/按按钮的原版入口）；</li>
-     *   <li>再看实体命中 → {@code interactOn(...)}（右键生物/实体）；</li>
-     *   <li>都没有 → {@code gameMode.useItem(...)}（吃食物、扔珍珠、拉弓等）。</li>
-     * </ol>
-     *
-     * <p>之前只调 useItem，所以假人永远放不下方块 —— 放置走的是 useItemOn。
+     * 一次"右键"：交给虚拟客户端构造原版 UseItem/UseItemOn 包，
+     * 服务端的 {@link net.minecraft.server.network.ServerGamePacketListenerImpl}
+     * 会按原版逻辑处理（先方块、再实体、最后物品），模组改动自然生效。
      */
     private static void use(ServerPlayer player) {
-        InteractionHand hand = InteractionHand.MAIN_HAND;
-        ItemStack stack = player.getMainHandItem();
-        double reach = player.gameMode.isCreative() ? 5.0 : 4.5;
-        player.swing(hand, true);
-        try {
-            HitResult hit = player.pick(reach, 0.0F, false);
-            if (hit.getType() == HitResult.Type.BLOCK) {
-                InteractionResult result = player.gameMode.useItemOn(player, player.serverLevel(),
-                        stack, hand, (BlockHitResult) hit);
-                if (result.consumesAction()) {
-                    return;
-                }
-            }
-            Entity target = nearestTarget(player);
-            if (target != null) {
-                InteractionResult result = player.interactOn(target, hand);
-                if (result.consumesAction()) {
-                    return;
-                }
-            }
-            player.gameMode.useItem(player, player.serverLevel(), stack, hand);
-        } catch (Throwable t) {
-            FakePlayerLib.LOGGER.warn("[fakeplayerlib] use action failed: {}", t.toString());
-        }
+        player.swing(InteractionHand.MAIN_HAND, true);
+        top.hibermod.fakeplayer.FakeClient.use(player);
     }
 
     /**
