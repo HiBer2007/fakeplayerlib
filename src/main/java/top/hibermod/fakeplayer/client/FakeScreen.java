@@ -161,12 +161,35 @@ public class FakeScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(g, mouseX, mouseY, partialTick);
+        // 不用 renderBackground：它会在我们绘制之后叠加一次模糊后处理，
+        // 导致左侧容器面板发虚、和右侧按钮不在同一层（点击也会错位）。
+        // 这里自绘一层暗色遮罩，整屏保证只有一层绘制。
+        g.fill(0, 0, this.width, this.height, 0xC0101010);
         int left = guiLeft();
         int top = guiTop();
 
-        // 左侧：原版容器底板（玩家背包界面）
-        g.blit(TEXTURE, left, top, 0, 0, 176, 166);
+        // 左侧容器面板：自绘（原版容器底色 + 边框），与右侧按钮处在同一绘制层。
+        // 之前用 inventory.png 贴图做底板，实际画面上底板完全不可见，故改为纯绘制。
+        g.fill(left - 1, top - 1, left + 177, top + 167, 0xFF000000);      // 外边框
+        g.fill(left, top, left + 176, top + 166, 0xFFC6C6C6);               // 容器底色
+        g.fill(left, top, left + 176, top + 1, 0xFFFFFFFF);                 // 顶部高光
+        g.fill(left, top, left + 1, top + 166, 0xFFFFFFFF);                 // 左侧高光
+        g.fill(left + 175, top, left + 176, top + 166, 0xFF555555);         // 右侧阴影
+        g.fill(left, top + 165, left + 176, top + 166, 0xFF555555);         // 底部阴影
+
+        // 槽位：主背包 3×9、快捷栏 1×9、护甲 4、副手 1
+        for (int r = 0; r < 3; r++) {
+            for (int cIdx = 0; cIdx < 9; cIdx++) {
+                drawSlot(g, left + INV_LEFT + cIdx * 18, top + INV_TOP + r * 18);
+            }
+        }
+        for (int cIdx = 0; cIdx < 9; cIdx++) {
+            drawSlot(g, left + INV_LEFT + cIdx * 18, top + HOTBAR_TOP);
+        }
+        for (int i = 0; i < 4; i++) {
+            drawSlot(g, left + ARMOR_LEFT, top + ARMOR_TOP + i * 18);
+        }
+        drawSlot(g, left + OFFHAND_X, top + OFFHAND_Y);
 
         // 物品图标（只读快照）
         for (Slot s : slots) {
@@ -188,18 +211,29 @@ public class FakeScreen extends Screen {
         if (selected >= 0 && selected <= 8) {
             int hx = left + INV_LEFT + selected * 18;
             int hy = top + HOTBAR_TOP;
-            g.fill(hx - 1, hy - 1, hx + 17, hy + 17, 0x66FFFFFF);
+            g.fill(hx, hy, hx + 16, hy + 16, 0x55000000);
         }
 
-        // 信息与状态
-        g.drawString(this.font, name, left + 8, top + 6, 0xFFFFFF);
-        String pos = String.format("%.0f %.0f %.0f", x, y, z);
-        g.drawString(this.font, pos, left + 92, top + 6, 0xA0A0A0);
-        g.drawString(this.font, String.format("HP %.1f/%.1f  Food %d", health, maxHealth, food),
-                left + 8, top + 166 + 4, 0xA0A0A0);
-        g.drawString(this.font, dim, left + 8, top + 166 + 14, 0x707070);
+        // 信息
+        g.drawString(this.font, "§8" + name, left + 8, top + 6, 0x404040);
+        g.drawString(this.font, String.format("§8%.0f %.0f %.0f", x, y, z), left + 92, top + 6, 0x404040);
+        g.drawString(this.font, String.format("§8HP %.1f/%.1f  Food %d", health, maxHealth, food),
+                left + 8, top + 170, 0x404040);
+        g.drawString(this.font, "§8" + dim, left + 8, top + 180, 0x707070);
 
+        // 先把面板几何真正提交到 GPU。
+        // 不 flush 时的症状：面板被上一帧遗留的模糊后处理盖住，看着发虚、像在另一层。
+        g.flush();
         super.render(g, mouseX, mouseY, partialTick);
+    }
+
+    /** 原版风格的 18×18 槽位。 */
+    private void drawSlot(GuiGraphics g, int x, int y) {
+        g.fill(x, y, x + 18, y + 18, 0xFF8B8B8B);            // 槽底
+        g.fill(x, y, x + 18, y + 1, 0xFF373737);             // 上/左边框
+        g.fill(x, y, x + 1, y + 18, 0xFF373737);
+        g.fill(x, y + 17, x + 18, y + 18, 0xFFFFFFFF);       // 下/右高光
+        g.fill(x + 17, y, x + 18, y + 18, 0xFFFFFFFF);
     }
 
     private ItemStack stackOf(Slot s) {

@@ -97,7 +97,18 @@ public final class FakeCommand {
 
         root.then(Commands.literal("config")
                 .then(Commands.literal("save").executes(ctx -> configSave(ctx.getSource())))
-                .then(Commands.literal("reload").executes(ctx -> configReload(ctx.getSource()))));
+                .then(Commands.literal("reload").executes(ctx -> configReload(ctx.getSource())))
+                .then(Commands.literal("list").executes(ctx -> configList(ctx.getSource())))
+                .then(Commands.literal("set")
+                        .then(Commands.argument("key", StringArgumentType.word())
+                                .suggests((c, b) -> {
+                                    CONFIG_KEYS.forEach(b::suggest);
+                                    return b.buildFuture();
+                                })
+                                .then(Commands.argument("value", StringArgumentType.word())
+                                        .executes(ctx -> configSet(ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "key"),
+                                                StringArgumentType.getString(ctx, "value")))))));
 
         d.register(root);
     }
@@ -181,6 +192,102 @@ public final class FakeCommand {
     private static int configSave(CommandSourceStack src) {
         cfg().save(src.getServer());
         feedback(src, "§a设置已保存");
+        return 1;
+    }
+
+    /** 可点选的配置项（顺序即展示顺序）。 */
+    private static final java.util.List<String> CONFIG_KEYS = java.util.List.of(
+            "serverEnabled", "clientGuiEnabled", "viewDistance", "simulationDistance", "gameMode",
+            "denySpawnForPlayedNames", "denyLoginForFakeNames", "guardRealPlayerActions", "allowForce",
+            "spawnLevel", "killLevel", "moveLevel", "useLevel", "guiLevel");
+
+    private static final java.util.List<String> GAME_MODES = java.util.List.of(
+            "follow", "survival", "creative", "adventure", "spectator");
+
+    /**
+     * {@code /fakeplayerlib config list}：逐项列出当前值，每项文字可点击，
+     * 点击即执行对应的 {@code config set}（等效命令），并立刻保存 + 热重载。
+     */
+    private static int configList(CommandSourceStack src) {
+        feedback(src, "§6fakeplayerlib 配置 §7(点击数值切换，立即生效)");
+        for (String key : CONFIG_KEYS) {
+            Object value = readConfig(key);
+            if (value == null) {
+                continue;
+            }
+            Object next = nextValue(key, value);
+            var label = Component.literal("  §7" + key + " §e[§f" + value + "§e]")
+                    .withStyle(s -> s
+                            .withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                                    net.minecraft.network.chat.ClickEvent.Action.RUN_COMMAND,
+                                    "/fakeplayerlib config set " + key + " " + next))
+                            .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
+                                    net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
+                                    Component.literal("点击改为 " + next))));
+            src.sendSuccess(() -> label, false);
+        }
+        return 1;
+    }
+
+    private static Object readConfig(String key) {
+        try {
+            var f = FakeConfig.class.getField(key);
+            return f.get(cfg());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** 点击后的下一个值：布尔取反、权限等级 0→2→4→0、距离 -1→8→16→32→-1、模式循环。 */
+    private static Object nextValue(String key, Object value) {
+        if (value instanceof Boolean b) {
+            return !b;
+        }
+        if (value instanceof String s) {
+            int i = GAME_MODES.indexOf(s);
+            return GAME_MODES.get((i + 1) % GAME_MODES.size());
+        }
+        if (value instanceof Integer i) {
+            if (key.endsWith("Level")) {
+                return switch (i) {
+                    case 0 -> 2;
+                    case 2 -> 4;
+                    default -> 0;
+                };
+            }
+            return switch (i) {
+                case -1 -> 8;
+                case 8 -> 16;
+                case 16 -> 32;
+                default -> -1;
+            };
+        }
+        return value;
+    }
+
+    private static int configSet(CommandSourceStack src, String key, String raw) {
+        if (!CONFIG_KEYS.contains(key)) {
+            src.sendFailure(Component.literal("§cunknown config key: " + key));
+            return 0;
+        }
+        try {
+            var f = FakeConfig.class.getField(key);
+            Class<?> type = f.getType();
+            if (type == boolean.class) {
+                f.set(cfg(), Boolean.parseBoolean(raw));
+            } else if (type == int.class) {
+                f.set(cfg(), Integer.parseInt(raw));
+            } else {
+                f.set(cfg(), raw);
+            }
+        } catch (Throwable t) {
+            src.sendFailure(Component.literal("§cfailed to set " + key + ": " + t));
+            return 0;
+        }
+        // 热重载：立刻写盘并推送到所有活跃假人
+        cfg().save(src.getServer());
+        cfg().apply(FakePlayerLib.get());
+        feedback(src, "§a" + key + " = §e" + readConfig(key) + " §7(已保存并生效)");
         return 1;
     }
 

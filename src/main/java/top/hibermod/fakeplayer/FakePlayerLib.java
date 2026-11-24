@@ -52,6 +52,7 @@ public class FakePlayerLib {
         if (net.neoforged.fml.loading.FMLEnvironment.dist
                 == net.neoforged.api.distmarker.Dist.CLIENT) {
             bus.addListener(top.hibermod.fakeplayer.client.ClientSetup::registerClientCommands);
+            top.hibermod.fakeplayer.client.ClientSetup.registerPreviewHook();
         }
         bus.addListener(this::onTick);
         bus.addListener(this::onStopping);

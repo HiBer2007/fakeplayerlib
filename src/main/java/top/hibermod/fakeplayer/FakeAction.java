@@ -102,14 +102,8 @@ public final class FakeAction {
                 return;
             }
             p.attackNextTick = next(p.attackMode, p.attackInterval, gameTime);
-            Entity target = nearestTarget(player);
-            if (target != null) {
-                // 走虚拟客户端的原版交互包：服务端做距离校验后调用 player.attack，
-                // 模组对 handleInteract 的改动自然生效
-                top.hibermod.fakeplayer.FakeClient.attack(player, target);
-            } else {
-                player.swing(InteractionHand.MAIN_HAND, true);
-            }
+            // 真实左键：命中方块就挖、命中实体就打，走原版 PlayerAction/Interact 包
+            top.hibermod.fakeplayer.FakeClient.leftClick(player);
             if (p.attackMode == Mode.ONCE) {
                 p.attackMode = null;
             }

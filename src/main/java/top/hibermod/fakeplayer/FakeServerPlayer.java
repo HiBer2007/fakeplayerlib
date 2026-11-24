@@ -58,14 +58,4 @@ public class FakeServerPlayer extends ServerPlayer {
             lib.onFakeDeath(this);
         }
     }
-
-    @Override
-    public boolean isSpectator() {
-        return false;
-    }
-
-    @Override
-    public boolean isCreative() {
-        return false;
-    }
 }

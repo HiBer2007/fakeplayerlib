@@ -3,7 +3,6 @@ package top.hibermod.fakeplayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
-import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
@@ -12,70 +11,102 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.AABB;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 假人的"虚拟客户端"。
+ * 假人的"虚拟客户端"：把按键动作翻译成原版 Serverbound 包。
  *
- * <p>为什么需要它：原版服务端对玩家的处理是"客户端权威"——
- * {@code ServerGamePacketListenerImpl.tick()} 里的顺序是
- * <pre>
- *   resetPosition();            // firstGood* = 当前位置
- *   player.doTick();            // 服务端物理
- *   player.absMoveTo(firstGood*); // ← 物理结果被丢弃，位置以客户端上报为准
- * </pre>
- * 所以玩家的一切交互都从 <b>Serverbound 包</b> 进入服务端：
- * 移动、攻击（{@code handleInteract}）、放方块（{@code handleUseItemOn}）、
- * 用物品（{@code handleUseItem}）、丢弃（{@code handlePlayerAction}）。
+ * <p><b>为什么不再每 tick 上报移动包：</b>服务端物理（重力、摔落、击退）是在
+ * {@code player.doTick()} 里算出来的；而 {@code handleMovePlayer} 会用包里的坐标
+ * 校正实体位置，并顺带清掉 {@code fallDistance}。每 tick 上报等于每 tick 把
+ * "服务端算出的下落"覆盖成"上一 tick 的位置"——表现就是落地前一格突然减速、
+ * 以及永远没有摔落伤害。所以位置同步改用 {@code connection.resetPosition()}
+ * （只更新服务端的 firstGood* 基准，不动实体本身），物理完全交给服务端。
  *
- * <p>这个类就是把假人当作一个"没有任何渲染、只有输入的小客户端"：
- * 每 tick 上报位置，交互时构造原版数据包并交给真正的
- * {@code ServerGamePacketListenerImpl} 处理。
- * 好处是所有模组对这些包处理器的改动（反作弊、领地、权限、事件）都会自然生效，
- * 而不是我们在外面自己调 gameMode 绕过它们。
+ * <p>交互一律走原版包处理器，模组对这些处理器的改动自然生效：
+ * <ul>
+ *   <li>左键 = {@code handlePlayerAction(START_DESTROY_BLOCK)} 挖方块 /
+ *       {@code handleInteract} 打实体；</li>
+ *   <li>右键 = {@code handleUseItemOn}（方块与放置）→ {@code handleInteract}（实体）
+ *       → {@code handleUseItem}（物品）；</li>
+ *   <li>Q = {@code handlePlayerAction(DROP_ITEM)}。</li>
+ * </ul>
  */
 public final class FakeClient {
 
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
+    /** 每个假人正在挖的方块（UUID → BlockPos）。 */
+    private static final Map<UUID, BlockPos> BREAKING = new HashMap<>();
 
     private FakeClient() {
     }
 
-    /** 每 tick：像客户端一样上报自身位置，让服务端 firstGood* 与实体位置保持同步。 */
+    /** 每 tick：只同步服务端的位置基准，不覆盖物理结果。 */
     public static void tick(ServerPlayer player) {
         if (player.connection == null) {
             return;
         }
         try {
-            player.connection.handleMovePlayer(new ServerboundMovePlayerPacket.PosRot(
-                    player.getX(), player.getY(), player.getZ(),
-                    player.getYRot(), player.getXRot(), player.onGround()));
-            // 与客户端回执等价：清掉"等待客户端位置确认"状态
             player.connection.resetPosition();
         } catch (Throwable t) {
-            FakePlayerLib.LOGGER.debug("[fakeplayerlib] move report failed: {}", t.toString());
+            FakePlayerLib.LOGGER.debug("[fakeplayerlib] resetPosition failed: {}", t.toString());
         }
-    }
-
-    /** 攻击：走原版 {@code handleInteract}，服务端会做距离校验并调用 {@code player.attack}。 */
-    public static void attack(ServerPlayer player, Entity target) {
-        if (player.connection == null) {
-            player.attack(target);
-            return;
-        }
-        player.connection.handleInteract(
-                ServerboundInteractPacket.createAttackPacket(target, player.isShiftKeyDown()));
     }
 
     /**
-     * 一次右键：与原版客户端 {@code startUseItem} 的顺序一致 ——
-     * 方块 → {@code handleUseItemOn}（放置方块/开箱子/按钮），
-     * 实体 → {@code handleInteract}（交互），
-     * 否则 → {@code handleUseItem}（食物/投掷物/弓）。
+     * 左键。视线命中方块 → 开始挖（服务端 {@code gameMode.tick()} 会推进破坏进度）；
+     * 命中实体 → 攻击；都没命中 → 挥空。
      */
+    public static void leftClick(ServerPlayer player) {
+        if (player.connection == null) {
+            return;
+        }
+        double reach = player.gameMode.isCreative() ? 5.0 : 4.5;
+        HitResult hit = player.pick(reach, 0.0F, false);
+        if (hit.getType() == HitResult.Type.BLOCK) {
+            BlockHitResult block = (BlockHitResult) hit;
+            BlockPos pos = block.getBlockPos();
+            BlockPos current = BREAKING.get(player.getUUID());
+            if (!pos.equals(current)) {
+                stopBreaking(player);
+                player.connection.handlePlayerAction(new ServerboundPlayerActionPacket(
+                        ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
+                        pos, block.getDirection(), SEQUENCE.incrementAndGet()));
+                BREAKING.put(player.getUUID(), pos);
+            } else if (player.level().isEmptyBlock(pos)) {
+                // 方块已被挖掉：发一次停止，等下一个目标
+                stopBreaking(player);
+            }
+            player.swing(InteractionHand.MAIN_HAND, true);
+            return;
+        }
+        Entity target = rayTarget(player, reach);
+        if (target != null) {
+            stopBreaking(player);
+            player.connection.handleInteract(
+                    ServerboundInteractPacket.createAttackPacket(target, player.isShiftKeyDown()));
+            return;
+        }
+        stopBreaking(player);
+        player.swing(InteractionHand.MAIN_HAND, true);
+    }
+
+    /** 结束挖掘（松开左键）。 */
+    public static void stopBreaking(ServerPlayer player) {
+        BlockPos pos = BREAKING.remove(player.getUUID());
+        if (pos == null || player.connection == null) {
+            return;
+        }
+        player.connection.handlePlayerAction(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
+                pos, Direction.DOWN, SEQUENCE.incrementAndGet()));
+    }
+
+    /** 右键：方块 → 实体 → 物品，顺序与原版客户端一致。 */
     public static void use(ServerPlayer player) {
         InteractionHand hand = InteractionHand.MAIN_HAND;
         double reach = player.gameMode.isCreative() ? 5.0 : 4.5;
@@ -87,22 +118,25 @@ public final class FakeClient {
             if (hit.getType() == HitResult.Type.BLOCK) {
                 player.connection.handleUseItemOn(new ServerboundUseItemOnPacket(
                         hand, (BlockHitResult) hit, SEQUENCE.incrementAndGet()));
+                player.swing(hand, true);
                 return;
             }
             Entity target = rayTarget(player, reach);
             if (target != null) {
                 player.connection.handleInteract(ServerboundInteractPacket.createInteractionPacket(
                         target, player.isShiftKeyDown(), hand));
+                player.swing(hand, true);
                 return;
             }
             player.connection.handleUseItem(new ServerboundUseItemPacket(
                     hand, SEQUENCE.incrementAndGet(), player.getYRot(), player.getXRot()));
+            player.swing(hand, true);
         } catch (Throwable t) {
             FakePlayerLib.LOGGER.warn("[fakeplayerlib] use packet failed: {}", t.toString());
         }
     }
 
-    /** 丢弃手持物：原版 DROP_ITEM 动作包。 */
+    /** Q 键：丢弃手持（单个或整栈）。 */
     public static void drop(ServerPlayer player, boolean all) {
         if (player.connection == null) {
             player.drop(all);
@@ -116,10 +150,10 @@ public final class FakeClient {
 
     /** 与客户端一致的实体射线检测。 */
     public static Entity rayTarget(ServerPlayer player, double reach) {
-        Vec3 eye = player.getEyePosition();
-        Vec3 look = player.getLookAngle();
-        Vec3 end = eye.add(look.scale(reach));
-        AABB box = player.getBoundingBox().expandTowards(look.scale(reach)).inflate(1.0);
+        var eye = player.getEyePosition();
+        var look = player.getLookAngle();
+        var end = eye.add(look.scale(reach));
+        var box = player.getBoundingBox().expandTowards(look.scale(reach)).inflate(1.0);
         var hit = net.minecraft.world.entity.projectile.ProjectileUtil.getEntityHitResult(
                 player, eye, end, box,
                 e -> !e.isSpectator() && e.isPickable() && e != player,

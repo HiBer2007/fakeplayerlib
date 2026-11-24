@@ -335,7 +335,19 @@ public final class PlayerCommand {
             return 0;
         }
         if (slot == -1) {
-            p.getInventory().clearContent();
+            // 全部吐出：按格子逐个丢成掉落物（与原版手动丢一致），而不是静默清空
+            var inv = p.getInventory();
+            java.util.List<ItemStack> stacks = new java.util.ArrayList<>();
+            for (int i = 0; i < inv.getContainerSize(); i++) {
+                ItemStack st = inv.getItem(i);
+                if (!st.isEmpty()) {
+                    stacks.add(st.copy());
+                }
+            }
+            inv.clearContent();
+            for (ItemStack st : stacks) {
+                p.drop(st, false);
+            }
         } else if (slot == -2) {
             // 走原版 DROP_ITEM 动作包（等价于客户端按 Q），而不是直接清手
             top.hibermod.fakeplayer.FakeClient.drop(p, false);

@@ -27,6 +27,34 @@ public final class ClientSetup {
     }
 
     /**
+     * 开发自检钩子：游戏目录下存在 {@code config/fakeplayerlib/preview.flag} 时，
+     * 进游戏后直接打开面板（用假数据），方便截图检查布局。正常游玩时该文件不存在，钩子不动作。
+     */
+    public static void registerPreviewHook() {
+        var flag = java.nio.file.Path.of("config/fakeplayerlib/preview.flag");
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                (net.neoforged.neoforge.client.event.ClientTickEvent.Post event) -> {
+                    var mc = Minecraft.getInstance();
+                    if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen)) {
+                        return;
+                    }
+                    if (!java.nio.file.Files.exists(flag)) {
+                        return;
+                    }
+                    String demo = "{\"name\":\"preview\",\"dim\":\"minecraft:overworld\","
+                            + "\"x\":128,\"y\":70,\"z\":-256,\"health\":18.5,\"maxHealth\":20,"
+                            + "\"selected\":2,\"food\":17,"
+                            + "\"inv\":[{\"slot\":0,\"id\":\"minecraft:stone\",\"count\":64},"
+                            + "{\"slot\":2,\"id\":\"minecraft:diamond_sword\",\"count\":1},"
+                            + "{\"slot\":9,\"id\":\"minecraft:oak_log\",\"count\":32},"
+                            + "{\"slot\":13,\"id\":\"minecraft:golden_apple\",\"count\":3},"
+                            + "{\"slot\":36,\"id\":\"minecraft:diamond_boots\",\"count\":1},"
+                            + "{\"slot\":40,\"id\":\"minecraft:shield\",\"count\":1}]}";
+                    mc.setScreen(new FakeScreen(demo));
+                });
+    }
+
+    /**
      * 纯客户端指令 {@code /fakeplayerlibc}：不需要任何服务端权限。
      *
      * <p>现在只提供面板开关；服务端相关的开关仍在 {@code /fakeplayerlib}（需 OP）。
