@@ -106,7 +106,8 @@ public final class FakeGuiServer {
         try {
             viewer.connection.send(new top.hibermod.fakeplayer.net.FakeStatePayload(
                     fake.getGameProfile().getName(), s[0], s[1], s[2], s[3], s[4] == 1,
-                    s[5] == 1, s[6] == 1, s[7] == 1, s[8] == 1, s[9] == 1));
+                    s[5] == 1, s[6] == 1, s[7] == 1, s[8] == 1, s[9] == 1,
+                    FakePlayerLib.get().config().restockLowDurability));
         } catch (Throwable t) {
             FakePlayerLib.LOGGER.debug("[fakeplayerlib] state push failed: {}", t.toString());
         }

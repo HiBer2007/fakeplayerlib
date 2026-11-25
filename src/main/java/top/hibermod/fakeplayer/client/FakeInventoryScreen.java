@@ -42,6 +42,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
     private boolean autoEat;
     private boolean autoFish;
     private boolean autoRestock;
+    private boolean restockLowDurability = true;
     private boolean autoArmor;
 
     private final List<Button> toggleButtons = new ArrayList<>();
@@ -70,6 +71,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         this.autoEat = p.autoEat();
         this.autoFish = p.autoFish();
         this.autoRestock = p.autoTool();
+        this.restockLowDurability = p.restockLowDurability();
         this.autoArmor = p.autoArmor();
     }
 
@@ -146,6 +148,13 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
                         b -> runCommand("player " + fakeName() + " fly"))
                 .bounds(rx, ry, COL_W, 18).build();
         addRenderableWidget(toggleFly);
+        ry += 21;
+        // 低耐久补货：全局配置，点击即取反并立即生效
+        toggleLowDurability = Button.builder(Component.empty(),
+                        b -> runCommand("fakeplayerlib config set restockLowDurability "
+                                + (!restockLowDurability)))
+                .bounds(rx, ry, COL_W, 18).build();
+        addRenderableWidget(toggleLowDurability);
 
         // ---- 底部两行：控制（整行居中） ----
         int by = panelY + panelH + GAP;
@@ -168,6 +177,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
     }
 
     private Button toggleFly;
+    private Button toggleLowDurability;
 
     private int buttonText(int x, int y, int w, String key, String commandTail) {
         addRenderableWidget(Button.builder(Component.translatable(key),
@@ -241,6 +251,11 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         if (toggleFly != null) {
             String base = Component.translatable("fakeplayerlib.gui.fly").getString();
             toggleFly.setMessage(Component.literal(base + (stateFlying ? " §a[ON]" : " §c[OFF]")));
+        }
+        if (toggleLowDurability != null) {
+            String base = Component.translatable("fakeplayerlib.gui.low_durability").getString();
+            toggleLowDurability.setMessage(Component.literal(
+                    base + ": " + (restockLowDurability ? "§aON" : "§cOFF")));
         }
         super.render(g, mouseX, mouseY, partialTick);
         this.renderTooltip(g, mouseX, mouseY);

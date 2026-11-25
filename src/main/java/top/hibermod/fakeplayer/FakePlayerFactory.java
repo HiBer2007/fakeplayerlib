@@ -29,11 +29,13 @@ public final class FakePlayerFactory {
 
     public static ServerPlayer spawn(MinecraftServer server, ServerLevel level,
                                      String name, double x, double y, double z) {
+        long tProfileStart = System.nanoTime();
         // y 由调用方保证是脚底坐标（见 feetY(CommandSourceStack)）
         double feetY = y;
         UUID uuid = offlineUuid(name);
         GameProfile profile = resolveProfile(server, uuid, name);
         var cookie = CommonListenerCookie.createInitial(profile, false);
+        long tProfile = System.nanoTime();
 
         ServerPlayer player = new FakeServerPlayer(server, level, profile,
                 ClientInformation.createDefault());
@@ -51,7 +53,9 @@ public final class FakePlayerFactory {
         FakePlayerLib.get().track(uuid, name, connection);
 
         // placeNewPlayer 内部会建 ServerGamePacketListenerImpl 并挂到 player.connection
+        long tJoinStart = System.nanoTime();
         server.getPlayerList().placeNewPlayer(connection, player, cookie);
+        long tJoined = System.nanoTime();
 
         // 与 Carpet 的生成步骤对齐（当前版本没有带 Set/boolean 的 teleportTo 重载）
         player.stopRiding();                       // 否则假人会骑在上一个载具上
@@ -72,7 +76,18 @@ public final class FakePlayerFactory {
 
         FakePlayerLib.LOGGER.info("[fakeplayerlib] spawned fake player {} @ {} {} {} {}",
                 name, level.dimension().location(), x, y, z);
+        long tPersistStart = System.nanoTime();
         FakePlayerLib.get().persist();
+        long tDone = System.nanoTime();
+        // 分步耗时：定位卡顿到底发生在哪一步（单位毫秒）
+        FakePlayerLib.LOGGER.info(
+                "[fakeplayerlib] spawn timing {}: profile={}ms join={}ms post={}ms persist={}ms total={}ms",
+                name,
+                (tProfile - tProfileStart) / 1_000_000.0,
+                (tJoined - tJoinStart) / 1_000_000.0,
+                (tPersistStart - tJoined) / 1_000_000.0,
+                (tDone - tPersistStart) / 1_000_000.0,
+                (tDone - tProfileStart) / 1_000_000.0);
         return player;
     }
 
@@ -97,34 +112,25 @@ public final class FakePlayerFactory {
     }
 
     /**
-     * 尽量补齐皮肤：正版账号名可以换到带 textures 的 profile，
-     * 离线/无网络时失败并回落到无皮肤（与 Carpet 行为一致）。
+     * 补齐皮肤：只查服务端本地 usercache（快，无网络）。
+     *
+     * <p><b>不要</b>在生成流程里调用 {@code sessionService.fetchProfile} ——
+     * 那是同步 HTTP 请求（还要 SHA1/会话校验），在单人/离线环境会阻塞服务器线程，
+     * 表现就是"假人一加入服务器就卡一次"。皮肤缺失可以接受，卡顿不行。
      */
     private static GameProfile resolveProfile(MinecraftServer server, UUID uuid, String name) {
-        // 1) 服务端的 usercache（正版玩家连过本服，就有带 textures 的档案）——
-        //    这是唯一在离线环境下也能拿到皮肤的来源
         try {
             var cached = server.getProfileCache().get(name);
             if (cached.isPresent()) {
                 var p = cached.get();
                 if (!p.getProperties().isEmpty()) {
-                    // 身份仍用离线 UUID（避免和真玩家撞号），只借它的皮肤属性
                     GameProfile merged = new GameProfile(uuid, p.getName());
                     merged.getProperties().putAll(p.getProperties());
                     return merged;
                 }
             }
         } catch (Throwable ignored) {
-        }
-        // 2) 会话服务（需要网络与正版校验）
-        try {
-            var resolved = server.getSessionService().fetchProfile(uuid, true);
-            if (resolved != null && resolved.profile() != null
-                    && !resolved.profile().getProperties().isEmpty()) {
-                return resolved.profile();
-            }
-        } catch (Throwable ignored) {
-            // 离线环境 / 无网络：保持无皮肤
+            // 缓存不可用时保持无皮肤
         }
         return new GameProfile(uuid, name);
     }
