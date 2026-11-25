@@ -199,7 +199,7 @@ public final class FakeCommand {
     private static final java.util.List<String> CONFIG_KEYS = java.util.List.of(
             "serverEnabled", "clientGuiEnabled", "viewDistance", "simulationDistance", "gameMode",
             "denySpawnForPlayedNames", "denyLoginForFakeNames", "guardRealPlayerActions", "allowForce",
-            "autoEatEnabled", "autoFishEnabled", "autoToolEnabled", "autoArmorEnabled",
+            "autoEatEnabled", "autoFishEnabled", "autoRestockEnabled", "restockLowDurability", "autoArmorEnabled",
             "autoEatHealthPercent", "autoEatFoodPercent",
             "spawnLevel", "killLevel", "moveLevel", "useLevel", "guiLevel");
 

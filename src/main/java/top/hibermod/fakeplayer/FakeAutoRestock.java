@@ -70,10 +70,14 @@ public final class FakeAutoRestock {
         return true;
     }
 
-    /** 空的、或耐久只剩 1（下一次使用就碎）都需要换。 */
+    /** 空的、或（开关打开时）耐久只剩 1 的都需要换。 */
     private static boolean needsReplace(ItemStack stack) {
         if (stack.isEmpty()) {
             return true;
+        }
+        var cfg = FakePlayerLib.get().config();
+        if (!cfg.restockLowDurability) {
+            return false;
         }
         return stack.isDamageableItem() && stack.getMaxDamage() - stack.getDamageValue() <= 1;
     }
