@@ -199,6 +199,8 @@ public final class FakeCommand {
     private static final java.util.List<String> CONFIG_KEYS = java.util.List.of(
             "serverEnabled", "clientGuiEnabled", "viewDistance", "simulationDistance", "gameMode",
             "denySpawnForPlayedNames", "denyLoginForFakeNames", "guardRealPlayerActions", "allowForce",
+            "autoEatEnabled", "autoFishEnabled", "autoToolEnabled", "autoArmorEnabled",
+            "autoEatHealthPercent", "autoEatFoodPercent",
             "spawnLevel", "killLevel", "moveLevel", "useLevel", "guiLevel");
 
     private static final java.util.List<String> GAME_MODES = java.util.List.of(
@@ -248,6 +250,16 @@ public final class FakeCommand {
             return GAME_MODES.get((i + 1) % GAME_MODES.size());
         }
         if (value instanceof Integer i) {
+            if (key.endsWith("Percent")) {
+                // 百分比：0 → 25 → 50 → 75 → 100 → 0
+                return switch (i) {
+                    case 0 -> 25;
+                    case 25 -> 50;
+                    case 50 -> 75;
+                    case 75 -> 100;
+                    default -> 0;
+                };
+            }
             if (key.endsWith("Level")) {
                 return switch (i) {
                     case 0 -> 2;

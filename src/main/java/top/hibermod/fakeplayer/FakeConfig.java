@@ -60,10 +60,10 @@ public final class FakeConfig {
     public boolean autoToolEnabled = false;
     /** 自动换护甲（默认关）。 */
     public boolean autoArmorEnabled = false;
-    /** 血量低于等于该值就吃（金苹果类）。 */
-    public float autoEatHealth = 8.0F;
-    /** 饱食度低于等于该值就吃。 */
-    public int autoEatFood = 14;
+    /** 血量百分比阈值：当前血量 ≤ 最大血量的这个百分比就吃（默认 50%）。 */
+    public int autoEatHealthPercent = 50;
+    /** 饱食度百分比阈值：当前饱食度 ≤ 20 的这个百分比就吃（默认 70% → 14）。 */
+    public int autoEatFoodPercent = 70;
 
     // ---- 指令权限等级（0=普通玩家，2=OP，4=控制台） ----
     public int spawnLevel = 2;

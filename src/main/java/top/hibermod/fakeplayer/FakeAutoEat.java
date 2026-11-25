@@ -67,8 +67,12 @@ public final class FakeAutoEat {
             return;
         }
         FakeConfig cfg = FakePlayerLib.get().config();
-        boolean hungry = player.getFoodData().getFoodLevel() <= cfg.autoEatFood;
-        boolean hurt = player.getHealth() <= cfg.autoEatHealth;
+        // 百分比阈值：血量按最大血量的百分比，饱食度按 20 的百分比
+        float hpPercent = player.getMaxHealth() <= 0 ? 100.0F
+                : player.getHealth() * 100.0F / player.getMaxHealth();
+        float foodPercent = player.getFoodData().getFoodLevel() * 100.0F / 20.0F;
+        boolean hungry = foodPercent <= cfg.autoEatFoodPercent;
+        boolean hurt = hpPercent <= cfg.autoEatHealthPercent;
         if (!hungry && !hurt) {
             return;
         }
