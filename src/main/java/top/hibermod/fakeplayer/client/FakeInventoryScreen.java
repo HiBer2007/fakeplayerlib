@@ -9,16 +9,29 @@ import net.minecraft.world.entity.player.Inventory;
 import top.hibermod.fakeplayer.menu.FakeInventoryMenu;
 import top.hibermod.fakeplayer.net.FakeStatePayload;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * 假人容器界面：左侧是真正的容器（槽位绑定假人背包，可拖拽 / Q 丢出 / Shift 移动），
- * 右侧是两列操作按钮（全部等价于执行 {@code /player} 指令）。
+ * 假人容器界面。
  *
- * <p>HP / 饱食度 / 快捷栏高亮 / 飞行状态来自服务端的 {@link FakeStatePayload}：
- * 服务端在值变化时下发，界面收到即更新 —— 不轮询、不过期。
+ * <p>布局按需求分区：
+ * <pre>
+ *   顶部两行：移动（前/后/左/右，上/下，蹲下 一次/一直/停止）
+ *   左列：左右键操作（使用/攻击 × 一次/按住/停止）＋ 间隔刻数输入与“按间隔”按钮
+ *   中间：真正的容器（槽位绑定假人背包，可拖拽 / Q 丢出 / Shift 移动）
+ *   右列：自动化与状态（自动进食/钓鱼/换工具/换护甲、切换飞行）
+ *   底部两行：控制（快捷栏 1–9；丢出全部、传送到我身边、传送到假人、刷新、移除）
+ * </pre>
+ *
+ * <p>HP / 饱食度 / 选中槽 / 各开关状态来自 {@link FakeStatePayload}，服务端值变化即下发。
  */
 public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMenu> {
 
     private static FakeInventoryScreen CURRENT;
+
+    private static final int COL_W = 108;
+    private static final int GAP = 6;
 
     private EditBox intervalBox;
     private int stateSelected = -1;
@@ -29,9 +42,9 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
     private boolean autoFish;
     private boolean autoTool;
     private boolean autoArmor;
-    private boolean sneaking;
-    private final java.util.List<Button> toggleButtons = new java.util.ArrayList<>();
-    private final java.util.List<String> toggleActions = new java.util.ArrayList<>();
+
+    private final List<Button> toggleButtons = new ArrayList<>();
+    private final List<String> toggleActions = new ArrayList<>();
 
     public FakeInventoryScreen(FakeInventoryMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
@@ -47,12 +60,15 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         return CURRENT;
     }
 
-    /** 服务端下发的实时状态。 */
     public void applyState(FakeStatePayload p) {
         this.stateSelected = p.selected();
         this.stateFood = p.food();
         this.stateHealth = p.health();
         this.stateFlying = p.flying();
+        this.autoEat = p.autoEat();
+        this.autoFish = p.autoFish();
+        this.autoTool = p.autoTool();
+        this.autoArmor = p.autoArmor();
     }
 
     @Override
@@ -60,52 +76,110 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         super.init();
         CURRENT = this;
 
-        int col1 = this.leftPos + this.imageWidth + 8;
-        int col2 = col1 + 108 + 4;
-        int w = 108;
-        int row = 21;
+        int panelX = this.leftPos;
+        int panelY = this.topPos;
+        int panelW = this.imageWidth;
+        int panelH = this.imageHeight;
 
-        int c1y = this.topPos + 2;
-        c1y = button(col1, c1y, w, "fakeplayerlib.gui.use_once", "use");
-        c1y = button(col1, c1y, w, "fakeplayerlib.gui.use_hold", "use_continuous");
-        c1y = button(col1, c1y, w, "fakeplayerlib.gui.use_stop", "use_stop");
-        c1y = button(col1, c1y, w, "fakeplayerlib.gui.attack_once", "attack");
-        c1y = button(col1, c1y, w, "fakeplayerlib.gui.attack_hold", "attack_continuous");
-        c1y = button(col1, c1y, w, "fakeplayerlib.gui.attack_stop", "attack_stop");
-        button(col1, c1y, w, "fakeplayerlib.gui.drop", "drop_all");
+        int originX = panelX - COL_W - GAP;
+        int originY = panelY - 2 * 21 - GAP;
+        if (originX < 2) {
+            originX = 2;
+        }
+        if (originY < 2) {
+            originY = 2;
+        }
 
-        int c2y = this.topPos + 2;
-        intervalBox = new EditBox(this.font, col2, c2y, 46, 18,
+        // ---- 顶部两行：移动 ----
+        int w4 = 52;
+        int row1 = originY;
+        buttonText(originX, row1, w4, "fakeplayerlib.gui.move_fwd", "move forward");
+        buttonText(originX + w4 + 2, row1, w4, "fakeplayerlib.gui.move_back", "move back");
+        buttonText(originX + (w4 + 2) * 2, row1, w4, "fakeplayerlib.gui.move_left", "move left");
+        buttonText(originX + (w4 + 2) * 3, row1, w4, "fakeplayerlib.gui.move_right", "move right");
+        int row2 = row1 + 21;
+        int w5 = 41;
+        buttonText(originX, row2, w5, "fakeplayerlib.gui.move_up", "move up");
+        buttonText(originX + w5 + 2, row2, w5, "fakeplayerlib.gui.move_down", "move down");
+        buttonText(originX + (w5 + 2) * 2, row2, w5, "fakeplayerlib.gui.sneak_once", "sneak once");
+        buttonText(originX + (w5 + 2) * 3, row2, w5, "fakeplayerlib.gui.sneak_hold", "sneak hold");
+        buttonText(originX + (w5 + 2) * 4, row2, w5, "fakeplayerlib.gui.sneak_stop", "sneak stop");
+
+        // ---- 左列：左右键操作 + 间隔 ----
+        int lx = panelX - COL_W - GAP;
+        int ly = panelY;
+        ly = buttonText(lx, ly, COL_W, "fakeplayerlib.gui.use_once", "use once");
+        ly = buttonText(lx, ly, COL_W, "fakeplayerlib.gui.use_hold", "use continuous");
+        ly = buttonText(lx, ly, COL_W, "fakeplayerlib.gui.use_stop", "use stop");
+        ly = buttonText(lx, ly, COL_W, "fakeplayerlib.gui.attack_once", "attack once");
+        ly = buttonText(lx, ly, COL_W, "fakeplayerlib.gui.attack_hold", "attack continuous");
+        ly = buttonText(lx, ly, COL_W, "fakeplayerlib.gui.attack_stop", "attack stop");
+
+        intervalBox = new EditBox(this.font, lx, ly, 46, 18,
                 Component.translatable("fakeplayerlib.gui.ticks"));
         intervalBox.setValue("20");
         intervalBox.setMaxLength(3);
         addRenderableWidget(intervalBox);
-        final int ticksY = c2y;
+        final int ty = ly;
         addRenderableOnly((g, mx, my, pt) -> g.drawString(this.font,
-                Component.translatable("fakeplayerlib.gui.ticks").getString(),
-                col2 + 50, ticksY + 5, 0xA0A0A0));
-        c2y += row;
-        addRenderableWidget(Button.builder(Component.translatable("fakeplayerlib.gui.use_interval"),
-                b -> runCommand("player " + fakeName() + " use interval " + intervalValue()))
-                .bounds(col2, c2y, w, 18).build());
-        c2y += row;
-        addRenderableWidget(Button.builder(Component.translatable("fakeplayerlib.gui.attack_interval"),
-                b -> runCommand("player " + fakeName() + " attack interval " + intervalValue()))
-                .bounds(col2, c2y, w, 18).build());
-        c2y += row;
+                Component.translatable("fakeplayerlib.gui.ticks").getString(), lx + 50, ty + 5, 0x404040));
+        ly += 21;
+        ly = buttonText(lx, ly, COL_W, "fakeplayerlib.gui.use_interval",
+                "use interval " + intervalValue());
+        buttonText(lx, ly, COL_W, "fakeplayerlib.gui.attack_interval",
+                "attack interval " + intervalValue());
 
+        // ---- 右列：自动化与状态 ----
+        int rx = panelX + panelW + GAP;
+        int ry = panelY;
+        ry = toggleButton(rx, ry, COL_W, "autoeat");
+        ry = toggleButton(rx, ry, COL_W, "autofish");
+        ry = toggleButton(rx, ry, COL_W, "autotool");
+        ry = toggleButton(rx, ry, COL_W, "autoarmor");
+        toggleFly = Button.builder(Component.translatable("fakeplayerlib.gui.fly"),
+                        b -> runCommand("player " + fakeName() + " fly"))
+                .bounds(rx, ry, COL_W, 18).build();
+        addRenderableWidget(toggleFly);
+
+        // ---- 底部两行：控制 ----
+        int by = panelY + panelH + GAP;
         for (int i = 1; i <= 9; i++) {
             final int slot = i;
             addRenderableWidget(Button.builder(Component.literal(String.valueOf(i)),
                             b -> runCommand("player " + fakeName() + " hotbar " + slot))
-                    .bounds(col2 + (i - 1) * 12, c2y, 11, 18).build());
+                    .bounds(originX + (i - 1) * 12, by, 11, 18).build());
         }
-        c2y += row;
-        c2y = button(col2, c2y, w, "fakeplayerlib.gui.fly", "fly");
-        c2y = button(col2, c2y, w, "fakeplayerlib.gui.bring", "bring");
-        c2y = button(col2, c2y, w, "fakeplayerlib.gui.tp", "tp_to");
-        c2y = button(col2, c2y, w, "fakeplayerlib.gui.refresh", "refresh");
-        button(col2, c2y, w, "fakeplayerlib.gui.remove", "kill");
+        int by2 = by + 21;
+        int cw = 68;
+        buttonText(originX, by2, cw, "fakeplayerlib.gui.drop", "drop all");
+        sendButton(originX + cw + 2, by2, cw, "fakeplayerlib.gui.bring", "bring");
+        sendButton(originX + (cw + 2) * 2, by2, cw, "fakeplayerlib.gui.tp", "tp_to");
+        sendButton(originX + (cw + 2) * 3, by2, cw, "fakeplayerlib.gui.refresh", "refresh");
+        sendButton(originX + (cw + 2) * 4, by2, cw, "fakeplayerlib.gui.remove", "kill");
+    }
+
+    private Button toggleFly;
+
+    private int buttonText(int x, int y, int w, String key, String commandTail) {
+        addRenderableWidget(Button.builder(Component.translatable(key),
+                        b -> runCommand("player " + fakeName() + " " + commandTail))
+                .bounds(x, y, w, 18).build());
+        return y + 21;
+    }
+
+    private void sendButton(int x, int y, int w, String key, String action) {
+        addRenderableWidget(Button.builder(Component.translatable(key),
+                        b -> send(action)).bounds(x, y, w, 18).build());
+    }
+
+    private int toggleButton(int x, int y, int w, String action) {
+        Button b = Button.builder(Component.translatable("fakeplayerlib.gui." + action),
+                        btn -> runCommand("player " + fakeName() + " " + action))
+                .bounds(x, y, w, 18).build();
+        addRenderableWidget(b);
+        toggleButtons.add(b);
+        toggleActions.add(action);
+        return y + 21;
     }
 
     @Override
@@ -116,13 +190,6 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         super.removed();
     }
 
-    private int button(int x, int y, int w, String key, String action) {
-        addRenderableWidget(Button.builder(Component.translatable(key),
-                b -> send(action)).bounds(x, y, w, 18).build());
-        return y + 21;
-    }
-
-    /** 假人名字就是菜单标题（服务端打开时传入）。 */
     private String fakeName() {
         return this.getTitle().getString();
     }
@@ -142,34 +209,30 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         }
     }
 
-    /** 有指令的动作走指令（与手敲完全一致），没有指令的走 payload。 */
     private void send(String action) {
-        String name = fakeName();
-        String cmd = switch (action) {
-            case "use" -> "player " + name + " use once";
-            case "use_continuous" -> "player " + name + " use continuous";
-            case "use_stop" -> "player " + name + " use stop";
-            case "attack" -> "player " + name + " attack once";
-            case "attack_continuous" -> "player " + name + " attack continuous";
-            case "attack_stop" -> "player " + name + " attack stop";
-            case "drop_all" -> "player " + name + " drop all";
-            case "kill" -> "player " + name + " kill";
-            case "fly" -> "player " + name + " fly";
-            default -> null;
-        };
-        if (cmd != null) {
-            runCommand(cmd);
-            return;
-        }
         var mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.player != null && mc.player.connection != null) {
             mc.player.connection.send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(
-                    new top.hibermod.fakeplayer.net.FakeActionPayload(action + "|" + name)));
+                    new top.hibermod.fakeplayer.net.FakeActionPayload(action + "|" + fakeName())));
         }
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        for (int i = 0; i < toggleButtons.size(); i++) {
+            boolean state = switch (toggleActions.get(i)) {
+                case "autoeat" -> autoEat;
+                case "autofish" -> autoFish;
+                case "autotool" -> autoTool;
+                default -> autoArmor;
+            };
+            String base = Component.translatable("fakeplayerlib.gui." + toggleActions.get(i)).getString();
+            toggleButtons.get(i).setMessage(Component.literal(base + ": " + (state ? "§aON" : "§cOFF")));
+        }
+        if (toggleFly != null) {
+            String base = Component.translatable("fakeplayerlib.gui.fly").getString();
+            toggleFly.setMessage(Component.literal(base + (stateFlying ? " §a[ON]" : " §c[OFF]")));
+        }
         super.render(g, mouseX, mouseY, partialTick);
         this.renderTooltip(g, mouseX, mouseY);
     }
@@ -180,6 +243,9 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         int y = this.topPos;
         int w = this.imageWidth;
         int h = this.imageHeight;
+
+        // 背景遮罩 + 容器面板（与按钮同一次绘制，不额外分层）
+        g.fill(0, 0, this.width, this.height, 0x90000000);
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF000000);
         g.fill(x, y, x + w, y + h, 0xFFC6C6C6);
         g.fill(x, y, x + w, y + 1, 0xFFFFFFFF);
@@ -211,7 +277,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         g.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, 0x404040, false);
         int hp = this.stateHealth >= 0 ? this.stateHealth : this.menu.healthScaled();
         int food = this.stateFood >= 0 ? this.stateFood : this.menu.foodLevel();
-        String info = String.format("HP %d  Food %d%s", hp, food, this.stateFlying ? "  [Flying]" : "");
+        String info = String.format("HP %d  Food %d%s", hp, food, stateFlying ? "  [Flying]" : "");
         g.drawString(this.font, info, this.titleLabelX, this.imageHeight - 12, 0x404040, false);
     }
 }
