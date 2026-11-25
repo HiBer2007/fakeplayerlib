@@ -89,6 +89,11 @@ public final class FakeAction {
         if (p.useMode != null && due(p.useMode, p.useInterval, p.useNextTick, gameTime)) {
             // 正在使用物品（进食/拉弓/喝药）时不能重复发右键，否则会重置使用进度
             if (!player.isUsingItem()) {
+                // 连续按住的"使用"也做真实时间节流：高 tick 速率下不会一 tick 用十次
+                if (p.useMode == Mode.CONTINUOUS
+                        && !top.hibermod.fakeplayer.FakeTiming.ready(player.getUUID(), "use", 150L)) {
+                    return;
+                }
                 p.useNextTick = next(p.useMode, p.useInterval, gameTime);
                 use(player);
                 // ONCE 在"按下"这一刻就结束：不能等 isUsingItem 变假，

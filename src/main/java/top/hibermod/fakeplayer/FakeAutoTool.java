@@ -93,6 +93,10 @@ public final class FakeAutoTool {
         }
         LAST_MATERIAL.put(player.getUUID(), FakeAutoArmor.materialOf(tool));
         LAST_KIND.put(player.getUUID(), kindOf(tool));
+        FakePlayerLib.LOGGER.info("[fakeplayerlib] auto-tool {} slot={} <- {}",
+                player.getGameProfile().getName(), bestSlot,
+                net.minecraft.core.registries.BuiltInRegistries.ITEM
+                        .getKey(tool.getItem()).getPath());
         return true;
     }
 

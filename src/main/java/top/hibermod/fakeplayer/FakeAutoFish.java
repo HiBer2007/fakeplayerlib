@@ -4,36 +4,29 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
 /**
- * 自动钓鱼（参考 Carpet 的 AutoFish 状态机，并按本模组的右键实现做了调整）。
+ * 自动钓鱼（参考 Carpet 的 AutoFish 状态机，按本模组右键实现调整）。
  *
- * <p>状态机：
+ * <p>全部等待都用<b>毫秒</b>（{@link FakeTiming}），所以在 /tick rate 提高时不会疯狂抛收杆。
+ *
  * <ol>
- *   <li><b>没有浮漂</b>：抛竿（右键），随后进入冷却，避免同一 tick 又去收杆 ——
- *       之前"挥杆音效和收杆音效同时出现"就是缺这一步；</li>
- *   <li><b>有浮漂但还很新</b>（{@code tickCount < 40}）：什么都不做，等它落水；</li>
- *   <li><b>判定咬钩</b>：挂上了实体，或浮漂在水中且明显下沉；</li>
- *   <li>收杆后等 {@value #RECAST_DELAY} tick 再抛下一杆。</li>
+ *   <li>没浮漂 → 抛竿，并记下抛竿时间；</li>
+ *   <li>抛竿后 1500ms 内不判定咬钩（等浮漂落水）；</li>
+ *   <li>咬钩（挂上实体，或水中且明显下沉）→ 收杆；</li>
+ *   <li>收杆后 1000ms 再抛下一杆。</li>
  * </ol>
  */
 public final class FakeAutoFish {
 
-    private static final int RECAST_DELAY = 20;
-    /** 浮漂至少存活这么多 tick 才允许判定咬钩。 */
-    private static final int MIN_AGE = 40;
-    private static final int MAX_WAIT = 1200;
-
-    private static final Map<UUID, Integer> COOLDOWN = new HashMap<>();
+    private static final long MIN_AGE_MS = 1500L;
+    private static final long RECAST_MS = 1000L;
+    private static final long CAST_COOLDOWN_MS = 300L;
 
     private FakeAutoFish() {
     }
 
-    public static void forget(UUID uuid) {
-        COOLDOWN.remove(uuid);
+    public static void forget(java.util.UUID uuid) {
+        FakeTiming.forget(uuid);
     }
 
     public static void tick(ServerPlayer player) {
@@ -45,9 +38,8 @@ public final class FakeAutoFish {
         if (main.isEmpty() || !(main.getItem() instanceof net.minecraft.world.item.FishingRodItem)) {
             return;
         }
-        int cd = COOLDOWN.getOrDefault(player.getUUID(), 0);
-        if (cd > 0) {
-            COOLDOWN.put(player.getUUID(), cd - 1);
+        var id = player.getUUID();
+        if (!FakeTiming.ready(id, "fish-cooldown", CAST_COOLDOWN_MS)) {
             return;
         }
         if (player.isUsingItem()) {
@@ -55,18 +47,20 @@ public final class FakeAutoFish {
         }
         FishingHook hook = findHook(player);
         if (hook == null) {
-            FakeClient.use(player);                       // 抛竿
-            COOLDOWN.put(player.getUUID(), 10);           // 抛完先别急着收
+            if (FakeTiming.elapsed(id, "fish-recast", RECAST_MS)) {
+                FakeClient.use(player);
+                FakeTiming.mark(id, "fish-cast");
+            }
             return;
         }
-        if (hook.tickCount < MIN_AGE) {
-            return;                                       // 刚抛出，等落水
+        if (!FakeTiming.elapsed(id, "fish-cast", MIN_AGE_MS)) {
+            return;                                          // 刚抛出，等落水
         }
         boolean biting = hook.getHookedIn() != null
                 || (hook.isInWater() && hook.getDeltaMovement().y < -0.1D);
-        if (biting || hook.tickCount > MAX_WAIT) {
-            FakeClient.use(player);                       // 收杆
-            COOLDOWN.put(player.getUUID(), RECAST_DELAY);
+        if (biting) {
+            FakeClient.use(player);
+            FakeTiming.mark(id, "fish-recast");
         }
     }
 

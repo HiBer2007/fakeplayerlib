@@ -168,6 +168,7 @@ public final class FakePlayerFactory {
         top.hibermod.fakeplayer.FakeAutoArmor.forget(player.getUUID());
         top.hibermod.fakeplayer.FakeAutoTool.forget(player.getUUID());
         top.hibermod.fakeplayer.FakeToggles.forget(player.getUUID());
+        top.hibermod.fakeplayer.FakeTiming.forget(player.getUUID());
         boolean done = false;
         if (player.connection != null) {
             try {

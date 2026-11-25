@@ -45,6 +45,10 @@ public final class FakeAutoArmor {
         if (state == null || !state.autoArmor) {
             return;
         }
+        // 与 tick 速率无关的节流
+        if (!FakeTiming.ready(player.getUUID(), "armor-check", 250L)) {
+            return;
+        }
         for (int slot = 0; slot < 4; slot++) {
             if (!inv.armor.get(slot).isEmpty()) {
                 continue;
@@ -72,6 +76,10 @@ public final class FakeAutoArmor {
             inv.setItem(bestSlot, inv.armor.get(slot));
             inv.armor.set(slot, armor);
             memory[slot] = materialOf(armor);
+            FakePlayerLib.LOGGER.info("[fakeplayerlib] auto-armor {} slot={} <- {}",
+                    player.getGameProfile().getName(), slot,
+                    net.minecraft.core.registries.BuiltInRegistries.ITEM
+                            .getKey(armor.getItem()).getPath());
         }
     }
 

@@ -60,6 +60,10 @@ public final class FakeAutoEat {
         if (player.isUsingItem()) {
             return;
         }
+        // 与 tick 速率无关：最多每 250ms 评估一次（/tick rate 很高时不会疯狂换手）
+        if (!FakeTiming.ready(player.getUUID(), "eat-check", 250L)) {
+            return;
+        }
         FakeConfig cfg = FakePlayerLib.get().config();
         boolean hungry = player.getFoodData().getFoodLevel() <= cfg.autoEatFood;
         boolean hurt = player.getHealth() <= cfg.autoEatHealth;
@@ -80,6 +84,9 @@ public final class FakeAutoEat {
         PENDING.put(player.getUUID(), p);
         // 走真实右键：开始进食，后续由原版 usingItem 逻辑推进
         FakeClient.use(player);
+        FakePlayerLib.LOGGER.info("[fakeplayerlib] auto-eat {} slot={} food={} hp={}",
+                player.getGameProfile().getName(), slot,
+                player.getFoodData().getFoodLevel(), player.getHealth());
     }
 
     /** 快捷栏优先，然后主背包按行优先；只认"可直接吃"的食物。 */
