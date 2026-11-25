@@ -36,6 +36,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
     private EditBox intervalBox;
     private int stateSelected = -1;
     private int stateFood = -1;
+    private int stateSaturation = -1;
     private int stateHealth = -1;
     private boolean stateFlying;
     private boolean autoEat;
@@ -63,6 +64,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
     public void applyState(FakeStatePayload p) {
         this.stateSelected = p.selected();
         this.stateFood = p.food();
+        this.stateSaturation = p.saturation();
         this.stateHealth = p.health();
         this.stateFlying = p.flying();
         this.autoEat = p.autoEat();
@@ -90,20 +92,24 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
             originY = 2;
         }
 
-        // ---- 顶部两行：移动 ----
-        int w4 = 52;
+        // ---- 顶部两行：移动（整行居中，按钮加宽） ----
+        int contentLeft = originX;
+        int contentWidth = COL_W + GAP + panelW;
+        int w4 = (contentWidth - 3 * 2) / 4;
         int row1 = originY;
-        buttonText(originX, row1, w4, "fakeplayerlib.gui.move_fwd", "move forward");
-        buttonText(originX + w4 + 2, row1, w4, "fakeplayerlib.gui.move_back", "move back");
-        buttonText(originX + (w4 + 2) * 2, row1, w4, "fakeplayerlib.gui.move_left", "move left");
-        buttonText(originX + (w4 + 2) * 3, row1, w4, "fakeplayerlib.gui.move_right", "move right");
+        int row1X = contentLeft + (contentWidth - (w4 * 4 + 3 * 2)) / 2;
+        buttonText(row1X, row1, w4, "fakeplayerlib.gui.move_fwd", "move forward");
+        buttonText(row1X + w4 + 2, row1, w4, "fakeplayerlib.gui.move_back", "move back");
+        buttonText(row1X + (w4 + 2) * 2, row1, w4, "fakeplayerlib.gui.move_left", "move left");
+        buttonText(row1X + (w4 + 2) * 3, row1, w4, "fakeplayerlib.gui.move_right", "move right");
         int row2 = row1 + 21;
-        int w5 = 41;
-        buttonText(originX, row2, w5, "fakeplayerlib.gui.move_up", "move up");
-        buttonText(originX + w5 + 2, row2, w5, "fakeplayerlib.gui.move_down", "move down");
-        buttonText(originX + (w5 + 2) * 2, row2, w5, "fakeplayerlib.gui.sneak_once", "sneak once");
-        buttonText(originX + (w5 + 2) * 3, row2, w5, "fakeplayerlib.gui.sneak_hold", "sneak hold");
-        buttonText(originX + (w5 + 2) * 4, row2, w5, "fakeplayerlib.gui.sneak_stop", "sneak stop");
+        int w5 = (contentWidth - 4 * 2) / 5;
+        int row2X = contentLeft + (contentWidth - (w5 * 5 + 4 * 2)) / 2;
+        buttonText(row2X, row2, w5, "fakeplayerlib.gui.move_up", "move up");
+        buttonText(row2X + w5 + 2, row2, w5, "fakeplayerlib.gui.move_down", "move down");
+        buttonText(row2X + (w5 + 2) * 2, row2, w5, "fakeplayerlib.gui.sneak_once", "sneak once");
+        buttonText(row2X + (w5 + 2) * 3, row2, w5, "fakeplayerlib.gui.sneak_hold", "sneak hold");
+        buttonText(row2X + (w5 + 2) * 4, row2, w5, "fakeplayerlib.gui.sneak_stop", "sneak stop");
 
         // ---- 左列：左右键操作 + 间隔 ----
         int lx = panelX - COL_W - GAP;
@@ -141,21 +147,24 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
                 .bounds(rx, ry, COL_W, 18).build();
         addRenderableWidget(toggleFly);
 
-        // ---- 底部两行：控制 ----
+        // ---- 底部两行：控制（整行居中） ----
         int by = panelY + panelH + GAP;
+        int hbWidth = 9 * 13;
+        int hbX = contentLeft + (contentWidth - hbWidth) / 2;
         for (int i = 1; i <= 9; i++) {
             final int slot = i;
             addRenderableWidget(Button.builder(Component.literal(String.valueOf(i)),
                             b -> runCommand("player " + fakeName() + " hotbar " + slot))
-                    .bounds(originX + (i - 1) * 12, by, 11, 18).build());
+                    .bounds(hbX + (i - 1) * 13, by, 12, 18).build());
         }
         int by2 = by + 21;
-        int cw = 68;
-        buttonText(originX, by2, cw, "fakeplayerlib.gui.drop", "drop all");
-        sendButton(originX + cw + 2, by2, cw, "fakeplayerlib.gui.bring", "bring");
-        sendButton(originX + (cw + 2) * 2, by2, cw, "fakeplayerlib.gui.tp", "tp_to");
-        sendButton(originX + (cw + 2) * 3, by2, cw, "fakeplayerlib.gui.refresh", "refresh");
-        sendButton(originX + (cw + 2) * 4, by2, cw, "fakeplayerlib.gui.remove", "kill");
+        int cw = (contentWidth - 4 * 2) / 5;
+        int cx = contentLeft + (contentWidth - (cw * 5 + 4 * 2)) / 2;
+        buttonText(cx, by2, cw, "fakeplayerlib.gui.drop", "drop all");
+        sendButton(cx + cw + 2, by2, cw, "fakeplayerlib.gui.bring", "bring");
+        sendButton(cx + (cw + 2) * 2, by2, cw, "fakeplayerlib.gui.tp", "tp_to");
+        sendButton(cx + (cw + 2) * 3, by2, cw, "fakeplayerlib.gui.refresh", "refresh");
+        sendButton(cx + (cw + 2) * 4, by2, cw, "fakeplayerlib.gui.remove", "kill");
     }
 
     private Button toggleFly;
@@ -277,7 +286,10 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         g.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, 0x404040, false);
         int hp = this.stateHealth >= 0 ? this.stateHealth : this.menu.healthScaled();
         int food = this.stateFood >= 0 ? this.stateFood : this.menu.foodLevel();
-        String info = String.format("HP %d  Food %d%s", hp, food, stateFlying ? "  [Flying]" : "");
+        String sat = this.stateSaturation >= 0
+                ? String.format("%.1f", this.stateSaturation / 10.0F) : "-";
+        String info = String.format("HP %d  Food %d  Saturation %s%s", hp, food, sat,
+                stateFlying ? "  [Flying]" : "");
         g.drawString(this.font, info, this.titleLabelX, this.imageHeight - 12, 0x404040, false);
     }
 }

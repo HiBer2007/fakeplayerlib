@@ -9,21 +9,22 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 自动钓鱼（移植 Carpet 的 AutoFish 思路）。
+ * 自动钓鱼（参考 Carpet 的 AutoFish 状态机，并按本模组的右键实现做了调整）。
  *
  * <p>状态机：
  * <ol>
- *   <li>手上有钓竿且水里有自己的浮漂 → 等待；</li>
- *   <li>浮漂进入"咬钩"状态（{@code getHookedIn() != null} 或
- *       {@code currentState == HOOKED_IN_ENTITY}）→ 立刻右键收杆；</li>
- *   <li>收杆后等待 {@value #RECAST_DELAY} tick 再抛竿，避免连点；</li>
- *   <li>浮漂超时（{@value #MAX_WAIT} tick）也收杆重抛，防止卡死。</li>
+ *   <li><b>没有浮漂</b>：抛竿（右键），随后进入冷却，避免同一 tick 又去收杆 ——
+ *       之前"挥杆音效和收杆音效同时出现"就是缺这一步；</li>
+ *   <li><b>有浮漂但还很新</b>（{@code tickCount < 40}）：什么都不做，等它落水；</li>
+ *   <li><b>判定咬钩</b>：挂上了实体，或浮漂在水中且明显下沉；</li>
+ *   <li>收杆后等 {@value #RECAST_DELAY} tick 再抛下一杆。</li>
  * </ol>
- * 抛竿/收杆都走真实的右键入口（{@link FakeClient#use}），所以钓鱼判定是原版的。
  */
 public final class FakeAutoFish {
 
     private static final int RECAST_DELAY = 20;
+    /** 浮漂至少存活这么多 tick 才允许判定咬钩。 */
+    private static final int MIN_AGE = 40;
     private static final int MAX_WAIT = 1200;
 
     private static final Map<UUID, Integer> COOLDOWN = new HashMap<>();
@@ -54,14 +55,17 @@ public final class FakeAutoFish {
         }
         FishingHook hook = findHook(player);
         if (hook == null) {
-            // 没漂 → 抛竿
-            FakeClient.use(player);
+            FakeClient.use(player);                       // 抛竿
+            COOLDOWN.put(player.getUUID(), 10);           // 抛完先别急着收
             return;
         }
-        // 咬钩判定：挂上了实体（鱼咬钩时 hookedIn 会被设置），或浮漂明显下沉
-        boolean biting = hook.getHookedIn() != null || hook.getDeltaMovement().y < -0.05D;
+        if (hook.tickCount < MIN_AGE) {
+            return;                                       // 刚抛出，等落水
+        }
+        boolean biting = hook.getHookedIn() != null
+                || (hook.isInWater() && hook.getDeltaMovement().y < -0.1D);
         if (biting || hook.tickCount > MAX_WAIT) {
-            FakeClient.use(player);          // 收杆
+            FakeClient.use(player);                       // 收杆
             COOLDOWN.put(player.getUUID(), RECAST_DELAY);
         }
     }

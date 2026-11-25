@@ -5,43 +5,63 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 /**
  * 自动替换护甲。
  *
- * <p>触发：任意护甲槽为空（刚损坏/掉落）。选择顺序按需求：
- * <ol>
- *   <li><b>同等级优先</b>：先找与刚损坏那件相同材质的；</li>
- *   <li><b>护甲等级从高到低</b>：下界合金 &gt; 钻石 &gt; 铁 &gt; 金 &gt; 锁链 &gt; 皮革；</li>
- *   <li><b>格子顺序</b>：快捷栏 0–8，再主背包 9–35。</li>
- * </ol>
- * 护甲槽索引：0 脚、1 腿、2 胸、3 头（{@code PlayerInventory.armor} 顺序）。
+ * <p><b>记忆原本穿的材质</b>：每 tick 记录各护甲槽里当前装备的材质；
+ * 一旦某个槽变空（护甲爆掉），优先补同样材质的（锁链破了补锁链），
+ * 只有找不到同材质时才按材质等级从高到低，最后按格子顺序。
+ * 这解决了"锁链头盔破了却拿了铁头盔"的问题。
  */
 public final class FakeAutoArmor {
+
+    /** 每个假人各护甲槽最近一次装备的物品（用于记忆材质）。 */
+    private static final Map<UUID, String[]> LAST_MATERIAL = new HashMap<>();
 
     private FakeAutoArmor() {
     }
 
-    /** 每 tick：补满空护甲槽。 */
+    public static void forget(UUID uuid) {
+        LAST_MATERIAL.remove(uuid);
+    }
+
     public static void tick(ServerPlayer player) {
+        var inv = player.getInventory();
+        String[] memory = LAST_MATERIAL.computeIfAbsent(player.getUUID(), k -> new String[4]);
+
+        // 先更新记忆（记录当前仍穿着的护甲材质）
+        for (int slot = 0; slot < 4; slot++) {
+            ItemStack worn = inv.armor.get(slot);
+            if (!worn.isEmpty()) {
+                memory[slot] = materialOf(worn);
+            }
+        }
+
         var state = FakeToggles.peek(player.getUUID());
         if (state == null || !state.autoArmor) {
             return;
         }
-        var inv = player.getInventory();
         for (int slot = 0; slot < 4; slot++) {
             if (!inv.armor.get(slot).isEmpty()) {
                 continue;
             }
+            String wanted = memory[slot];
             int bestSlot = -1;
-            int bestRank = -1;
+            int bestScore = Integer.MIN_VALUE;
             for (int i = 0; i < 36; i++) {
                 ItemStack stack = inv.getItem(i);
                 if (stack.isEmpty() || !isArmorFor(stack, slot)) {
                     continue;
                 }
-                int rank = tierOf(stack);
-                if (rank > bestRank) {
-                    bestRank = rank;
+                // 同材质优先，其次材质等级从高到低；同分时按格子顺序（先遇到的优先）
+                int score = materialOf(stack).equals(wanted) ? 100 : 0;
+                score += tierOf(stack);
+                if (score > bestScore) {
+                    bestScore = score;
                     bestSlot = i;
                 }
             }
@@ -51,10 +71,10 @@ public final class FakeAutoArmor {
             ItemStack armor = inv.getItem(bestSlot);
             inv.setItem(bestSlot, inv.armor.get(slot));
             inv.armor.set(slot, armor);
+            memory[slot] = materialOf(armor);
         }
     }
 
-    /** 该物品是否属于这个护甲槽对应的部位。 */
     private static boolean isArmorFor(ItemStack stack, int slot) {
         return switch (slot) {
             case 0 -> stack.is(ItemTags.FOOT_ARMOR);
@@ -65,27 +85,22 @@ public final class FakeAutoArmor {
         };
     }
 
-    /** 材质等级：皮革 0 < 锁链 1 < 金 2 < 铁 3 < 钻 4 < 下界合金 5。 */
-    private static int tierOf(ItemStack stack) {
+    /** 材质前缀：leather / chainmail / iron / golden / diamond / netherite / 其它。 */
+    public static String materialOf(ItemStack stack) {
         String key = BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
-        if (key.startsWith("leather_")) {
-            return 0;
-        }
-        if (key.startsWith("chainmail_")) {
-            return 1;
-        }
-        if (key.startsWith("golden_")) {
-            return 2;
-        }
-        if (key.startsWith("iron_")) {
-            return 3;
-        }
-        if (key.startsWith("diamond_")) {
-            return 4;
-        }
-        if (key.startsWith("netherite_")) {
-            return 5;
-        }
-        return -1;
+        int idx = key.indexOf('_');
+        return idx > 0 ? key.substring(0, idx) : key;
+    }
+
+    private static int tierOf(ItemStack stack) {
+        return switch (materialOf(stack)) {
+            case "leather" -> 0;
+            case "chainmail" -> 1;
+            case "golden" -> 2;
+            case "iron" -> 3;
+            case "diamond" -> 4;
+            case "netherite" -> 5;
+            default -> -1;
+        };
     }
 }
