@@ -90,6 +90,7 @@ public final class FakeAutoTool {
             ItemStack hand = inv.getItem(inv.selected);
             inv.setItem(inv.selected, tool);
             inv.setItem(bestSlot, hand);
+        player.containerMenu.broadcastChanges();
         }
         LAST_MATERIAL.put(player.getUUID(), FakeAutoArmor.materialOf(tool));
         LAST_KIND.put(player.getUUID(), kindOf(tool));

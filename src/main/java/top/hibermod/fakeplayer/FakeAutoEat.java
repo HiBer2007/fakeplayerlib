@@ -82,6 +82,7 @@ public final class FakeAutoEat {
         inv.setItem(inv.selected, food);
         inv.setItem(slot, p.original.isEmpty() ? ItemStack.EMPTY : p.original);
         PENDING.put(player.getUUID(), p);
+        player.containerMenu.broadcastChanges();
         // 走真实右键：开始进食，后续由原版 usingItem 逻辑推进
         FakeClient.use(player);
         FakePlayerLib.LOGGER.info("[fakeplayerlib] auto-eat {} slot={} food={} hp={}",
