@@ -57,7 +57,7 @@ public final class FakeConfig {
     /** 自动钓鱼（默认关）。 */
     public boolean autoFishEnabled = false;
     /** 自动换工具（默认关）。 */
-    public boolean autoToolEnabled = false;
+    public boolean autoRestockEnabled = false;
     /** 自动换护甲（默认关）。 */
     public boolean autoArmorEnabled = false;
     /** 血量百分比阈值：当前血量 ≤ 最大血量的这个百分比就吃（默认 50%）。 */

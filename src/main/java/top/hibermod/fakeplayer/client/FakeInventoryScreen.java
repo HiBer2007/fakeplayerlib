@@ -41,7 +41,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
     private boolean stateFlying;
     private boolean autoEat;
     private boolean autoFish;
-    private boolean autoTool;
+    private boolean autoRestock;
     private boolean autoArmor;
 
     private final List<Button> toggleButtons = new ArrayList<>();
@@ -69,7 +69,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
         this.stateFlying = p.flying();
         this.autoEat = p.autoEat();
         this.autoFish = p.autoFish();
-        this.autoTool = p.autoTool();
+        this.autoRestock = p.autoTool();
         this.autoArmor = p.autoArmor();
     }
 
@@ -232,7 +232,7 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
             boolean state = switch (toggleActions.get(i)) {
                 case "autoeat" -> autoEat;
                 case "autofish" -> autoFish;
-                case "autotool" -> autoTool;
+                case "autotool", "autorest" -> autoRestock;
                 default -> autoArmor;
             };
             String base = Component.translatable("fakeplayerlib.gui." + toggleActions.get(i)).getString();

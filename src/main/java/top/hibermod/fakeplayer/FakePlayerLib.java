@@ -286,6 +286,8 @@ public class FakePlayerLib {
             if (p == null) {
                 continue;
             }
+            // 先补货再钓鱼：鱼竿断了能立刻补上，钓鱼状态机不会因为手里没竿而卡住
+            top.hibermod.fakeplayer.FakeAutoRestock.tick(p);
             top.hibermod.fakeplayer.FakeAutoFish.tick(p, gameTime);
             top.hibermod.fakeplayer.FakeAutoArmor.tick(p, gameTime);
             var toggles = top.hibermod.fakeplayer.FakeToggles.peek(p.getUUID());

@@ -20,7 +20,8 @@ public final class FakeToggles {
     public static final class State {
         public boolean autoEat = false;
         public boolean autoFish = false;
-        public boolean autoTool = false;
+        /** 自动补货（含工具/武器/鱼竿等所有种类）。 */
+        public boolean autoRestock = false;
         public boolean autoArmor = false;
         public Sneak sneak = Sneak.OFF;
     }

@@ -39,25 +39,30 @@ public final class FakeAutoFish {
             return;
         }
         var id = player.getUUID();
-        if (!FakeTiming.readyTicks(id, "fish-cooldown", 6, gameTime)) {
-            return;
-        }
-        if (player.isUsingItem()) {
-            return;
-        }
+        // 有漂时每 tick 都检查咬钩（高附魔下咬钩窗口很短，不能再被抛竿冷却挡住）
         FishingHook hook = findHook(player);
         if (hook == null) {
+            if (!FakeTiming.readyTicks(id, "fish-cooldown", 6, gameTime)) {
+                return;
+            }
+            if (player.isUsingItem()) {
+                return;
+            }
             if (FakeTiming.elapsedTicks(id, "fish-recast", 20, gameTime)) {
                 FakeClient.use(player);
                 FakeTiming.markTicks(id, "fish-cast", gameTime);
             }
             return;
         }
+        if (player.isUsingItem()) {
+            return;
+        }
         if (!FakeTiming.elapsedTicks(id, "fish-cast", 30, gameTime)) {
             return;                                          // 刚抛出，等落水
         }
         boolean biting = hook.getHookedIn() != null
-                || (hook.isInWater() && hook.getDeltaMovement().y < -0.1D);
+                || hook.getDeltaMovement().y < -0.08D
+                || (hook.isInWater() && hook.getDeltaMovement().y < 0.0D);
         if (biting) {
             FakeClient.use(player);
             FakeTiming.markTicks(id, "fish-recast", gameTime);

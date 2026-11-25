@@ -95,7 +95,7 @@ public final class FakeGuiServer {
                 fake.getAbilities().flying ? 1 : 0,
                 toggles != null && toggles.autoEat ? 1 : 0,
                 toggles != null && toggles.autoFish ? 1 : 0,
-                toggles != null && toggles.autoTool ? 1 : 0,
+                toggles != null && toggles.autoRestock ? 1 : 0,
                 toggles != null && toggles.autoArmor ? 1 : 0,
                 toggles != null
                         && toggles.sneak != top.hibermod.fakeplayer.FakeToggles.Sneak.OFF ? 1 : 0};

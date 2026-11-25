@@ -220,6 +220,11 @@ public final class PlayerCommand {
             ServerPlayer fake = top.hibermod.fakeplayer.FakePlayerFactory.spawn(
                     server, src.getLevel(), name, pos.x, feetY, pos.z);
             applyGameMode(src, fake);
+            // 朝向与召唤者一致
+            var rot = src.getRotation();
+            fake.setYRot(rot.y);
+            fake.setXRot(rot.x);
+            fake.setYHeadRot(rot.y);
             cfg().applyTo(fake);
             ok(src, "§aspawned §e" + name);
             return 1;
@@ -423,7 +428,7 @@ public final class PlayerCommand {
         }
         var st = top.hibermod.fakeplayer.FakeToggles.of(p.getUUID());
         ok(src, "§6" + name + " §7eat=" + st.autoEat + " fish=" + st.autoFish
-                + " tool=" + st.autoTool + " armor=" + st.autoArmor + " sneak=" + st.sneak);
+                + " restock=" + st.autoRestock + " armor=" + st.autoArmor + " sneak=" + st.sneak);
         ok(src, String.format("§7hp=%.1f food=%d sat=%.1f using=%s",
                 p.getHealth(), p.getFoodData().getFoodLevel(),
                 p.getFoodData().getSaturationLevel(), p.isUsingItem()));
@@ -466,8 +471,8 @@ public final class PlayerCommand {
                 yield st.autoFish;
             }
             case "tool" -> {
-                st.autoTool = value == null ? !st.autoTool : value;
-                yield st.autoTool;
+                st.autoRestock = value == null ? !st.autoRestock : value;
+                yield st.autoRestock;
             }
             default -> {
                 st.autoArmor = value == null ? !st.autoArmor : value;
