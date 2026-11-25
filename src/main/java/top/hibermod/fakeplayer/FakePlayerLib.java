@@ -286,8 +286,8 @@ public class FakePlayerLib {
             if (p == null) {
                 continue;
             }
-            top.hibermod.fakeplayer.FakeAutoFish.tick(p);
-            top.hibermod.fakeplayer.FakeAutoArmor.tick(p);
+            top.hibermod.fakeplayer.FakeAutoFish.tick(p, gameTime);
+            top.hibermod.fakeplayer.FakeAutoArmor.tick(p, gameTime);
             var toggles = top.hibermod.fakeplayer.FakeToggles.peek(p.getUUID());
             if (toggles != null) {
                 p.setShiftKeyDown(toggles.sneak != top.hibermod.fakeplayer.FakeToggles.Sneak.OFF);
@@ -300,7 +300,7 @@ public class FakePlayerLib {
         for (Entry e : fakes.values()) {
             ServerPlayer p = event.getServer().getPlayerList().getPlayer(e.uuid());
             if (p != null) {
-                FakeAutoEat.tick(p);
+                FakeAutoEat.tick(p, gameTime);
             }
         }
         if (event.getServer().getTickCount() % 200 == 0) {

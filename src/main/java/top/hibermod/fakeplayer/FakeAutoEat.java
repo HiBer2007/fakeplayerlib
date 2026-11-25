@@ -35,7 +35,7 @@ public final class FakeAutoEat {
     }
 
     /** 每 tick 由 FakePlayerLib 调用。 */
-    public static void tick(ServerPlayer player) {
+    public static void tick(ServerPlayer player, long gameTime) {
         FakeToggles.State toggles = FakeToggles.peek(player.getUUID());
         if (toggles == null || !toggles.autoEat) {
             return;
@@ -61,7 +61,7 @@ public final class FakeAutoEat {
             return;
         }
         // 与 tick 速率无关：最多每 250ms 评估一次（/tick rate 很高时不会疯狂换手）
-        if (!FakeTiming.ready(player.getUUID(), "eat-check", 250L)) {
+        if (!FakeTiming.readyTicks(player.getUUID(), "eat-check", 5, gameTime)) {
             return;
         }
         FakeConfig cfg = FakePlayerLib.get().config();

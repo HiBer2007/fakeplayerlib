@@ -29,7 +29,7 @@ public final class FakeAutoFish {
         FakeTiming.forget(uuid);
     }
 
-    public static void tick(ServerPlayer player) {
+    public static void tick(ServerPlayer player, long gameTime) {
         var state = FakeToggles.peek(player.getUUID());
         if (state == null || !state.autoFish) {
             return;
@@ -39,7 +39,7 @@ public final class FakeAutoFish {
             return;
         }
         var id = player.getUUID();
-        if (!FakeTiming.ready(id, "fish-cooldown", CAST_COOLDOWN_MS)) {
+        if (!FakeTiming.readyTicks(id, "fish-cooldown", 6, gameTime)) {
             return;
         }
         if (player.isUsingItem()) {
@@ -47,20 +47,20 @@ public final class FakeAutoFish {
         }
         FishingHook hook = findHook(player);
         if (hook == null) {
-            if (FakeTiming.elapsed(id, "fish-recast", RECAST_MS)) {
+            if (FakeTiming.elapsedTicks(id, "fish-recast", 20, gameTime)) {
                 FakeClient.use(player);
-                FakeTiming.mark(id, "fish-cast");
+                FakeTiming.markTicks(id, "fish-cast", gameTime);
             }
             return;
         }
-        if (!FakeTiming.elapsed(id, "fish-cast", MIN_AGE_MS)) {
+        if (!FakeTiming.elapsedTicks(id, "fish-cast", 30, gameTime)) {
             return;                                          // 刚抛出，等落水
         }
         boolean biting = hook.getHookedIn() != null
                 || (hook.isInWater() && hook.getDeltaMovement().y < -0.1D);
         if (biting) {
             FakeClient.use(player);
-            FakeTiming.mark(id, "fish-recast");
+            FakeTiming.markTicks(id, "fish-recast", gameTime);
         }
     }
 

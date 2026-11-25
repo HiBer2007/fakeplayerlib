@@ -29,7 +29,7 @@ public final class FakeAutoArmor {
         LAST_MATERIAL.remove(uuid);
     }
 
-    public static void tick(ServerPlayer player) {
+    public static void tick(ServerPlayer player, long gameTime) {
         var inv = player.getInventory();
         String[] memory = LAST_MATERIAL.computeIfAbsent(player.getUUID(), k -> new String[4]);
 
@@ -46,7 +46,7 @@ public final class FakeAutoArmor {
             return;
         }
         // 与 tick 速率无关的节流
-        if (!FakeTiming.ready(player.getUUID(), "armor-check", 250L)) {
+        if (!FakeTiming.readyTicks(player.getUUID(), "armor-check", 5, gameTime)) {
             return;
         }
         for (int slot = 0; slot < 4; slot++) {

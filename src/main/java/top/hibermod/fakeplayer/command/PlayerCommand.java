@@ -113,7 +113,8 @@ public final class PlayerCommand {
                 .then(toggleNode("autoeat", "eat"))
                 .then(toggleNode("autofish", "fish"))
                 .then(toggleNode("autotool", "tool"))
-                .then(toggleNode("autoarmor", "armor")));
+                .then(toggleNode("autoarmor", "armor"))
+                .then(Commands.literal("status").executes(c -> status(c.getSource(), name(c)))));
         d.register(root);
     }
 
@@ -411,6 +412,32 @@ public final class PlayerCommand {
         p.getAbilities().flying = on;
         p.onUpdateAbilities();
         ok(src, "§a" + name + " flying = " + on);
+        return 1;
+    }
+
+    /** 诊断：打印该假人的开关与各自动系统的前置条件，用于定位"开了却不动作"的原因。 */
+    private static int status(CommandSourceStack src, String name) {
+        ServerPlayer p = target(src, name, false, "status");
+        if (p == null) {
+            return 0;
+        }
+        var st = top.hibermod.fakeplayer.FakeToggles.of(p.getUUID());
+        ok(src, "§6" + name + " §7eat=" + st.autoEat + " fish=" + st.autoFish
+                + " tool=" + st.autoTool + " armor=" + st.autoArmor + " sneak=" + st.sneak);
+        ok(src, String.format("§7hp=%.1f food=%d sat=%.1f using=%s",
+                p.getHealth(), p.getFoodData().getFoodLevel(),
+                p.getFoodData().getSaturationLevel(), p.isUsingItem()));
+        var inv = p.getInventory();
+        ok(src, "§7held=" + inv.getItem(inv.selected).getItem()
+                + " selected=" + inv.selected);
+        StringBuilder armor = new StringBuilder("§7armor=");
+        for (int i = 0; i < 4; i++) {
+            armor.append(inv.armor.get(i).isEmpty() ? "-" : inv.armor.get(i).getItem().toString()).append(' ');
+        }
+        ok(src, armor.toString());
+        // 视线与可挖性，判断 autoTool 是否会触发
+        var hit = p.pick(4.5, 0.0F, false);
+        ok(src, "§7looking=" + hit.getType() + " at=" + hit.getLocation());
         return 1;
     }
 

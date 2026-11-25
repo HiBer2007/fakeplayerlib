@@ -44,6 +44,29 @@ public final class FakeTiming {
         LAST.put(key(uuid, action), System.currentTimeMillis());
     }
 
+    // ---- 按服务器 tick 计（/tick rate 提高时随之加快，符合"真实 tick"语义） ----
+
+    private static final Map<String, Long> LAST_TICK = new HashMap<>();
+
+    public static boolean readyTicks(UUID uuid, String action, long ticks, long gameTime) {
+        String k = key(uuid, action);
+        Long last = LAST_TICK.get(k);
+        if (last != null && gameTime - last < ticks) {
+            return false;
+        }
+        LAST_TICK.put(k, gameTime);
+        return true;
+    }
+
+    public static boolean elapsedTicks(UUID uuid, String action, long ticks, long gameTime) {
+        Long last = LAST_TICK.get(key(uuid, action));
+        return last == null || gameTime - last >= ticks;
+    }
+
+    public static void markTicks(UUID uuid, String action, long gameTime) {
+        LAST_TICK.put(key(uuid, action), gameTime);
+    }
+
     public static void forget(UUID uuid) {
         String prefix = uuid + "|";
         LAST.keySet().removeIf(k -> k.startsWith(prefix));
