@@ -90,8 +90,9 @@ public final class FakeAutoTool {
             ItemStack hand = inv.getItem(inv.selected);
             inv.setItem(inv.selected, tool);
             inv.setItem(bestSlot, hand);
-        player.containerMenu.broadcastChanges();
         }
+        // 直接改背包后让打开的容器重新同步，避免客户端看到的槽位被回滚
+        player.containerMenu.broadcastChanges();
         LAST_MATERIAL.put(player.getUUID(), FakeAutoArmor.materialOf(tool));
         LAST_KIND.put(player.getUUID(), kindOf(tool));
         FakePlayerLib.LOGGER.info("[fakeplayerlib] auto-tool {} slot={} <- {}",

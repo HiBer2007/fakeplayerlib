@@ -52,6 +52,8 @@ public final class FakeAutoEat {
                 ItemStack remaining = inv.getItem(inv.selected);
                 inv.setItem(inv.selected, pending.original);
                 inv.setItem(pending.slot, remaining);
+                // 直接改背包后让打开的容器重新同步
+                player.containerMenu.broadcastChanges();
             }
             PENDING.remove(player.getUUID());
             return;

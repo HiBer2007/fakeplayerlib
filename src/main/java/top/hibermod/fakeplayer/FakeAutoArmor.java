@@ -75,7 +75,8 @@ public final class FakeAutoArmor {
             ItemStack armor = inv.getItem(bestSlot);
             inv.setItem(bestSlot, inv.armor.get(slot));
             inv.armor.set(slot, armor);
-        player.containerMenu.broadcastChanges();
+            // 直接改背包后让打开的容器重新同步
+            player.containerMenu.broadcastChanges();
             memory[slot] = materialOf(armor);
             FakePlayerLib.LOGGER.info("[fakeplayerlib] auto-armor {} slot={} <- {}",
                     player.getGameProfile().getName(), slot,
