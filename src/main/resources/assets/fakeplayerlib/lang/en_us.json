@@ -15,5 +15,12 @@
   "fakeplayerlib.gui.refresh": "Refresh",
   "fakeplayerlib.gui.remove": "Remove",
   "fakeplayerlib.gui.ticks": "ticks",
-  "fakeplayerlib.gui.fly": "Toggle flight"
+'  "fakeplayerlib.gui.fly": "Toggle flight",
+  "fakeplayerlib.gui.autoeat": "Auto Eat",
+  "fakeplayerlib.gui.autofish": "Auto Fish",
+  "fakeplayerlib.gui.autotool": "Auto Tool",
+  "fakeplayerlib.gui.autoarmor": "Auto Armor",
+  "fakeplayerlib.gui.sneak_once": "Sneak: once",
+  "fakeplayerlib.gui.sneak_hold": "Sneak: hold",
+  "fakeplayerlib.gui.sneak_stop": "Sneak: stop"'
 }

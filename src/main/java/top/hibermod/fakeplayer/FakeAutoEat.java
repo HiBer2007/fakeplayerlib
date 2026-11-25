@@ -36,8 +36,8 @@ public final class FakeAutoEat {
 
     /** 每 tick 由 FakePlayerLib 调用。 */
     public static void tick(ServerPlayer player) {
-        FakeConfig cfg = FakePlayerLib.get().config();
-        if (!cfg.autoEatEnabled) {
+        FakeToggles.State toggles = FakeToggles.peek(player.getUUID());
+        if (toggles == null || !toggles.autoEat) {
             return;
         }
         var inv = player.getInventory();
@@ -60,6 +60,7 @@ public final class FakeAutoEat {
         if (player.isUsingItem()) {
             return;
         }
+        FakeConfig cfg = FakePlayerLib.get().config();
         boolean hungry = player.getFoodData().getFoodLevel() <= cfg.autoEatFood;
         boolean hurt = player.getHealth() <= cfg.autoEatHealth;
         if (!hungry && !hurt) {

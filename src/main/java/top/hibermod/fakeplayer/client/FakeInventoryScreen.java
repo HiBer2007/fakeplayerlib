@@ -25,6 +25,13 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
     private int stateFood = -1;
     private int stateHealth = -1;
     private boolean stateFlying;
+    private boolean autoEat;
+    private boolean autoFish;
+    private boolean autoTool;
+    private boolean autoArmor;
+    private boolean sneaking;
+    private final java.util.List<Button> toggleButtons = new java.util.ArrayList<>();
+    private final java.util.List<String> toggleActions = new java.util.ArrayList<>();
 
     public FakeInventoryScreen(FakeInventoryMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);

@@ -103,7 +103,17 @@ public final class PlayerCommand {
                         .requires(s -> perm(s, FakeConfig.Action.MOVE))
                         .executes(c -> fly(c.getSource(), name(c)))
                         .then(Commands.literal("on").executes(c -> fly2(c.getSource(), name(c), true)))
-                        .then(Commands.literal("off").executes(c -> fly2(c.getSource(), name(c), false)))));
+                        .then(Commands.literal("off").executes(c -> fly2(c.getSource(), name(c), false))))
+                .then(Commands.literal("sneak")
+                        .requires(s -> perm(s, FakeConfig.Action.MOVE))
+                        .executes(c -> sneak(c.getSource(), name(c), "once"))
+                        .then(Commands.literal("once").executes(c -> sneak(c.getSource(), name(c), "once")))
+                        .then(Commands.literal("hold").executes(c -> sneak(c.getSource(), name(c), "hold")))
+                        .then(Commands.literal("stop").executes(c -> sneak(c.getSource(), name(c), "stop"))))
+                .then(toggleNode("autoeat", "eat"))
+                .then(toggleNode("autofish", "fish"))
+                .then(toggleNode("autotool", "tool"))
+                .then(toggleNode("autoarmor", "armor")));
         d.register(root);
     }
 
@@ -401,6 +411,60 @@ public final class PlayerCommand {
         p.getAbilities().flying = on;
         p.onUpdateAbilities();
         ok(src, "§a" + name + " flying = " + on);
+        return 1;
+    }
+
+    /** 自动功能开关：{@code /player <name> autoeat [on|off]}，不带参数则切换。 */
+    private static LiteralArgumentBuilder<CommandSourceStack> toggleNode(String command, String key) {
+        return Commands.literal(command)
+                .requires(s -> perm(s, FakeConfig.Action.USE))
+                .executes(c -> toggle(c.getSource(), name(c), key, null))
+                .then(Commands.literal("on").executes(c -> toggle(c.getSource(), name(c), key, true)))
+                .then(Commands.literal("off").executes(c -> toggle(c.getSource(), name(c), key, false)));
+    }
+
+    private static int toggle(CommandSourceStack src, String name, String key, Boolean value) {
+        ServerPlayer p = target(src, name, false, key);
+        if (p == null) {
+            return 0;
+        }
+        var st = top.hibermod.fakeplayer.FakeToggles.of(p.getUUID());
+        boolean now = switch (key) {
+            case "eat" -> {
+                st.autoEat = value == null ? !st.autoEat : value;
+                yield st.autoEat;
+            }
+            case "fish" -> {
+                st.autoFish = value == null ? !st.autoFish : value;
+                yield st.autoFish;
+            }
+            case "tool" -> {
+                st.autoTool = value == null ? !st.autoTool : value;
+                yield st.autoTool;
+            }
+            default -> {
+                st.autoArmor = value == null ? !st.autoArmor : value;
+                yield st.autoArmor;
+            }
+        };
+        ok(src, "§a" + name + " auto" + key + " = " + now);
+        return 1;
+    }
+
+    /** 蹲下：once（一瞬）、hold（一直）、stop（停止）。 */
+    private static int sneak(CommandSourceStack src, String name, String mode) {
+        ServerPlayer p = target(src, name, false, "sneak");
+        if (p == null) {
+            return 0;
+        }
+        var st = top.hibermod.fakeplayer.FakeToggles.of(p.getUUID());
+        st.sneak = switch (mode) {
+            case "hold" -> top.hibermod.fakeplayer.FakeToggles.Sneak.HOLD;
+            case "stop" -> top.hibermod.fakeplayer.FakeToggles.Sneak.OFF;
+            default -> top.hibermod.fakeplayer.FakeToggles.Sneak.ONCE;
+        };
+        p.setShiftKeyDown(st.sneak != top.hibermod.fakeplayer.FakeToggles.Sneak.OFF);
+        ok(src, "§a" + name + " sneak = " + mode);
         return 1;
     }
 

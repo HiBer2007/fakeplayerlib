@@ -86,18 +86,26 @@ public final class FakeGuiServer {
     }
 
     private static int[] stateOf(ServerPlayer fake) {
+        var toggles = top.hibermod.fakeplayer.FakeToggles.peek(fake.getUUID());
         return new int[]{
                 fake.getInventory().selected,
                 fake.getFoodData().getFoodLevel(),
                 (int) fake.getHealth(),
-                fake.getAbilities().flying ? 1 : 0};
+                fake.getAbilities().flying ? 1 : 0,
+                toggles != null && toggles.autoEat ? 1 : 0,
+                toggles != null && toggles.autoFish ? 1 : 0,
+                toggles != null && toggles.autoTool ? 1 : 0,
+                toggles != null && toggles.autoArmor ? 1 : 0,
+                toggles != null
+                        && toggles.sneak != top.hibermod.fakeplayer.FakeToggles.Sneak.OFF ? 1 : 0};
     }
 
     private static void push(ServerPlayer viewer, ServerPlayer fake) {
         int[] s = stateOf(fake);
         try {
             viewer.connection.send(new top.hibermod.fakeplayer.net.FakeStatePayload(
-                    fake.getGameProfile().getName(), s[0], s[1], s[2], s[3] == 1));
+                    fake.getGameProfile().getName(), s[0], s[1], s[2], s[3] == 1,
+                    s[4] == 1, s[5] == 1, s[6] == 1, s[7] == 1, s[8] == 1));
         } catch (Throwable t) {
             FakePlayerLib.LOGGER.debug("[fakeplayerlib] state push failed: {}", t.toString());
         }

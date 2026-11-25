@@ -15,5 +15,12 @@
   "fakeplayerlib.gui.refresh": "刷新",
   "fakeplayerlib.gui.remove": "移除假人",
   "fakeplayerlib.gui.ticks": "刻",
-  "fakeplayerlib.gui.fly": "切换飞行"
+'  "fakeplayerlib.gui.fly": "切换飞行",
+  "fakeplayerlib.gui.autoeat": "自动进食",
+  "fakeplayerlib.gui.autofish": "自动钓鱼",
+  "fakeplayerlib.gui.autotool": "自动换工具",
+  "fakeplayerlib.gui.autoarmor": "自动换护甲",
+  "fakeplayerlib.gui.sneak_once": "蹲下：一次",
+  "fakeplayerlib.gui.sneak_hold": "蹲下：一直",
+  "fakeplayerlib.gui.sneak_stop": "蹲下：停止"'
 }

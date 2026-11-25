@@ -74,6 +74,7 @@ public final class FakeClient {
             BlockPos current = BREAKING.get(player.getUUID());
             if (!pos.equals(current)) {
                 stopBreaking(player);
+                top.hibermod.fakeplayer.FakeAutoTool.ensureBestTool(player, pos);
             player.gameMode.handleBlockBreakAction(pos,
                     ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
                     block.getDirection(), player.level().getMaxBuildHeight(),

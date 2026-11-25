@@ -280,6 +280,22 @@ public class FakePlayerLib {
         }
         // 容器界面的物品由原版容器协议同步；HP/饱食度/选中槽只在变化时下发
         top.hibermod.fakeplayer.gui.FakeGuiServer.sendStates(event.getServer());
+        // 自动钓鱼 / 自动换护甲 / 蹲下姿态
+        for (Entry e : fakes.values()) {
+            ServerPlayer p = event.getServer().getPlayerList().getPlayer(e.uuid());
+            if (p == null) {
+                continue;
+            }
+            top.hibermod.fakeplayer.FakeAutoFish.tick(p);
+            top.hibermod.fakeplayer.FakeAutoArmor.tick(p);
+            var toggles = top.hibermod.fakeplayer.FakeToggles.peek(p.getUUID());
+            if (toggles != null) {
+                p.setShiftKeyDown(toggles.sneak != top.hibermod.fakeplayer.FakeToggles.Sneak.OFF);
+                if (toggles.sneak == top.hibermod.fakeplayer.FakeToggles.Sneak.ONCE) {
+                    toggles.sneak = top.hibermod.fakeplayer.FakeToggles.Sneak.OFF;
+                }
+            }
+        }
         // 自动进食对每个活跃假人生效（不受动作包影响）
         for (Entry e : fakes.values()) {
             ServerPlayer p = event.getServer().getPlayerList().getPlayer(e.uuid());

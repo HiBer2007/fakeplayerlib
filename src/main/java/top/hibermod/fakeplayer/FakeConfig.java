@@ -53,7 +53,13 @@ public final class FakeConfig {
 
     // ---- 自动进食 ----
     /** 总开关。 */
-    public boolean autoEatEnabled = true;
+    public boolean autoEatEnabled = false;
+    /** 自动钓鱼（默认关）。 */
+    public boolean autoFishEnabled = false;
+    /** 自动换工具（默认关）。 */
+    public boolean autoToolEnabled = false;
+    /** 自动换护甲（默认关）。 */
+    public boolean autoArmorEnabled = false;
     /** 血量低于等于该值就吃（金苹果类）。 */
     public float autoEatHealth = 8.0F;
     /** 饱食度低于等于该值就吃。 */
