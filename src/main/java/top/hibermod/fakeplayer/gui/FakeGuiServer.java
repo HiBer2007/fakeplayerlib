@@ -98,7 +98,9 @@ public final class FakeGuiServer {
                 toggles != null && toggles.autoRestock ? 1 : 0,
                 toggles != null && toggles.autoArmor ? 1 : 0,
                 toggles != null
-                        && toggles.sneak != top.hibermod.fakeplayer.FakeToggles.Sneak.OFF ? 1 : 0};
+                        && toggles.sneak != top.hibermod.fakeplayer.FakeToggles.Sneak.OFF ? 1 : 0,
+                // 全局配置也纳入变化检测，否则改完低耐久补货开关不会重新下发
+                FakePlayerLib.get().config().restockLowDurability ? 1 : 0};
     }
 
     private static void push(ServerPlayer viewer, ServerPlayer fake) {

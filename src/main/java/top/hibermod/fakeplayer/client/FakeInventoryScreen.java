@@ -149,11 +149,11 @@ public class FakeInventoryScreen extends AbstractContainerScreen<FakeInventoryMe
                 .bounds(rx, ry, COL_W, 18).build();
         addRenderableWidget(toggleFly);
         ry += 21;
-        // 低耐久补货：全局配置，点击即取反并立即生效
-        toggleLowDurability = Button.builder(Component.empty(),
-                        b -> runCommand("fakeplayerlib config set restockLowDurability "
-                                + (!restockLowDurability)))
-                .bounds(rx, ry, COL_W, 18).build();
+        // 低耐久补货：全局配置，点击立即取反（先本地翻转，指令随后同步服务端状态）
+        toggleLowDurability = Button.builder(Component.empty(), b -> {
+            restockLowDurability = !restockLowDurability;
+            runCommand("fakeplayerlib config set restockLowDurability " + restockLowDurability);
+        }).bounds(rx, ry, COL_W, 18).build();
         addRenderableWidget(toggleLowDurability);
 
         // ---- 底部两行：控制（整行居中） ----
